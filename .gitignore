@@ -1,0 +1,15 @@
+# Database file (will be created fresh on deploy)
+*.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
