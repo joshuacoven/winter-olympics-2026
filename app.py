@@ -205,81 +205,101 @@ def my_predictions_page():
     # Get user's prediction sets
     sets = get_user_prediction_sets(st.session_state.user_name)
 
-    # Create new set section
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        new_set_name = st.text_input("Create new prediction set", placeholder="e.g., My Bold Picks")
-    with col2:
-        st.write("")  # Spacing
-        if st.button("Create", use_container_width=True):
-            if new_set_name:
-                set_id = create_prediction_set(st.session_state.user_name, new_set_name.strip())
-                if set_id:
-                    st.success(f"Created '{new_set_name}'")
-                    st.session_state.current_set_id = set_id
-                    st.rerun()
-                else:
-                    st.error("A set with that name already exists")
-
+    # Handle case with no sets
     if not sets:
         st.info("Create a prediction set to start making predictions!")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            new_set_name = st.text_input(
+                "Set name",
+                placeholder="e.g., My Bold Picks",
+                key="first_set_name_input"
+            )
+        with col2:
+            st.write("")  # Spacing
+            if st.button("Create", use_container_width=True, type="primary"):
+                if new_set_name:
+                    set_id = create_prediction_set(st.session_state.user_name, new_set_name.strip())
+                    if set_id:
+                        st.session_state.current_set_id = set_id
+                        st.rerun()
+                    else:
+                        st.error("A set with that name already exists")
         return
 
-    st.markdown("---")
+    # Build tab names: prediction set names + "+" for new
+    tab_names = [s["name"] for s in sets] + ["➕"]
 
-    # Set selector
-    set_options = {s["id"]: s["name"] for s in sets}
-    set_ids = list(set_options.keys())
+    # Create tabs
+    tabs = st.tabs(tab_names)
 
-    if st.session_state.current_set_id not in set_ids:
-        st.session_state.current_set_id = set_ids[0]
+    # Render content for each prediction set tab
+    for i, pred_set in enumerate(sets):
+        with tabs[i]:
+            st.session_state.current_set_id = pred_set["id"]
+            render_prediction_set_content(pred_set)
 
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        selected_set_id = st.selectbox(
-            "Select prediction set to edit",
-            options=set_ids,
-            format_func=lambda x: set_options[x],
-            index=set_ids.index(st.session_state.current_set_id),
-            key="set_selector"
-        )
+    # Render the "+" tab content for creating new sets
+    with tabs[-1]:
+        st.subheader("Create New Prediction Set")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            new_set_name = st.text_input(
+                "Set name",
+                placeholder="e.g., My Bold Picks",
+                key="new_set_name_input"
+            )
+        with col2:
+            st.write("")  # Spacing
+            if st.button("Create", use_container_width=True, type="primary", key="create_new_set_btn"):
+                if new_set_name:
+                    set_id = create_prediction_set(st.session_state.user_name, new_set_name.strip())
+                    if set_id:
+                        st.success(f"Created '{new_set_name}'")
+                        st.session_state.current_set_id = set_id
+                        st.rerun()
+                    else:
+                        st.error("A set with that name already exists")
+                else:
+                    st.error("Please enter a name for the set")
+
+
+def render_prediction_set_content(pred_set):
+    """Render the content for a prediction set tab."""
+    set_id = pred_set["id"]
+
+    # Delete button for current set
+    col1, col2 = st.columns([6, 1])
     with col2:
-        st.write("")
-        if st.button("Delete Set", type="secondary"):
-            delete_prediction_set(selected_set_id)
+        if st.button("🗑️ Delete", key=f"delete_set_{set_id}", type="secondary", use_container_width=True):
+            delete_prediction_set(set_id)
             st.session_state.current_set_id = None
             st.rerun()
 
-    if selected_set_id != st.session_state.current_set_id:
-        st.session_state.current_set_id = selected_set_id
-        st.rerun()
-
-    st.markdown("---")
-
-    # Filters
+    # Filters - unique keys per set
     col1, col2, col3 = st.columns(3)
     with col1:
         sport_filter = st.selectbox(
             "Sport",
             options=["All"] + get_sports_list(),
-            key="pred_sport_filter"
+            key=f"pred_sport_filter_{set_id}"
         )
     with col2:
         gender_filter = st.selectbox(
             "Gender",
             options=["All", "Men", "Women", "Mixed"],
-            key="pred_gender_filter"
+            key=f"pred_gender_filter_{set_id}"
         )
     with col3:
         sort_by = st.selectbox(
             "Sort by",
             options=["Sport", "Event Date", "Alphabetical"],
-            key="pred_sort_by"
+            key=f"pred_sort_by_{set_id}"
         )
 
     # Get categories and predictions
     categories = get_all_categories()
-    predictions = get_predictions_for_set(st.session_state.current_set_id)
+    predictions = get_predictions_for_set(set_id)
     results = get_category_results()
     countries = get_countries()
 
@@ -306,7 +326,7 @@ def my_predictions_page():
 
     # Callback for saving predictions
     def save_prediction(category_id: str, country: str):
-        save_set_prediction(st.session_state.current_set_id, category_id, country)
+        save_set_prediction(set_id, category_id, country)
         st.rerun()
 
     # Render category cards in grid
@@ -326,7 +346,7 @@ def my_predictions_page():
                         countries=countries,
                         tz_name=st.session_state.timezone,
                         on_change_callback=save_prediction,
-                        card_key=f"pred_{category.id}"
+                        card_key=f"pred_{set_id}_{category.id}"
                     )
 
 
