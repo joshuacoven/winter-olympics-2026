@@ -75,6 +75,52 @@ st.markdown("""
     .stRadio > div > label > div:first-child {
         display: none;
     }
+    /* Keep pointer cursor on selectbox until clicked */
+    [data-testid="stSelectbox"],
+    [data-testid="stSelectbox"] * {
+        cursor: pointer !important;
+    }
+    /* Hide "Press Enter to apply" helper text */
+    .stTextInput div[data-testid="InputInstructions"] {
+        display: none;
+    }
+    /* Pill-style dropdowns - smaller width */
+    [data-testid="stSelectbox"] {
+        max-width: 160px;
+    }
+    [data-testid="stSelectbox"] > div > div {
+        border-radius: 25px;
+        border: 1px solid #ccc;
+        background-color: white;
+        padding: 2px 12px;
+        min-height: 38px;
+    }
+    /* Style Delete Set button as plain text, right-aligned */
+    button[kind="secondary"] {
+        background: none !important;
+        border: none !important;
+        color: #666;
+        font-weight: normal;
+        padding: 0;
+        float: right;
+    }
+    button[kind="secondary"]:hover {
+        background: none !important;
+        border: none !important;
+        color: #333;
+    }
+    /* Vertical spacing - tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        margin-bottom: 24px;
+    }
+    /* Vertical spacing - after filter row */
+    .stProgress {
+        margin-top: 24px;
+    }
+    /* Vertical spacing - prediction cards */
+    [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
+        margin-bottom: 16px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -268,34 +314,40 @@ def render_prediction_set_content(pred_set):
     """Render the content for a prediction set tab."""
     set_id = pred_set["id"]
 
-    # Delete button for current set
-    col1, col2 = st.columns([6, 1])
+    # Filters and delete on one row
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    with col1:
+        sport_options = ["Sport (All)"] + get_sports_list()
+        sport_filter = st.selectbox(
+            "Sport",
+            options=sport_options,
+            key=f"pred_sport_filter_{set_id}",
+            label_visibility="collapsed"
+        )
+        if sport_filter == "Sport (All)":
+            sport_filter = "All"
     with col2:
-        if st.button("🗑️ Delete", key=f"delete_set_{set_id}", type="secondary", use_container_width=True):
+        gender_options = ["Gender (All)", "Men", "Women", "Mixed"]
+        gender_filter = st.selectbox(
+            "Gender",
+            options=gender_options,
+            key=f"pred_gender_filter_{set_id}",
+            label_visibility="collapsed"
+        )
+        if gender_filter == "Gender (All)":
+            gender_filter = "All"
+    with col3:
+        sort_by = st.selectbox(
+            "Sort",
+            options=["Sort: Event Date", "Sort: Alphabetical"],
+            key=f"pred_sort_by_{set_id}",
+            label_visibility="collapsed"
+        )
+    with col4:
+        if st.button("Delete Set", key=f"delete_set_{set_id}", type="secondary"):
             delete_prediction_set(set_id)
             st.session_state.current_set_id = None
             st.rerun()
-
-    # Filters - unique keys per set
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        sport_filter = st.selectbox(
-            "Sport",
-            options=["All"] + get_sports_list(),
-            key=f"pred_sport_filter_{set_id}"
-        )
-    with col2:
-        gender_filter = st.selectbox(
-            "Gender",
-            options=["All", "Men", "Women", "Mixed"],
-            key=f"pred_gender_filter_{set_id}"
-        )
-    with col3:
-        sort_by = st.selectbox(
-            "Sort by",
-            options=["Sport", "Event Date", "Alphabetical"],
-            key=f"pred_sort_by_{set_id}"
-        )
 
     # Get categories and predictions
     categories = get_all_categories()
@@ -310,12 +362,14 @@ def render_prediction_set_content(pred_set):
         categories = [c for c in categories if c.gender == gender_filter]
 
     # Apply sorting
-    if sort_by == "Event Date":
-        categories = sorted(categories, key=lambda c: c.first_event_date or datetime.max)
-    elif sort_by == "Alphabetical":
+    if sort_by == "Sort: Event Date":
+        # Sort by date, but keep overall categories first
+        overall = [c for c in categories if c.is_overall]
+        non_overall = [c for c in categories if not c.is_overall]
+        non_overall = sorted(non_overall, key=lambda c: c.first_event_date or datetime.max)
+        categories = overall + non_overall
+    else:  # Alphabetical
         categories = sorted(categories, key=lambda c: c.display_name)
-    else:  # Sport
-        categories = sorted(categories, key=lambda c: (c.sport, c.display_name))
 
     # Progress
     all_categories = get_all_categories()

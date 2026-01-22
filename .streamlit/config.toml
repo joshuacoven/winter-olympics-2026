@@ -1,0 +1,14 @@
+[theme]
+# Explicitly define all colors to force light mode (no theme switcher shown)
+base = "light"
+primaryColor = "#3d5a80"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
