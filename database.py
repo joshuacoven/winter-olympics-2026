@@ -266,11 +266,24 @@ def pool_exists(code: str) -> bool:
     return exists
 
 
-def create_pool(name: str, created_by: str) -> str:
+def pool_name_exists(name: str) -> bool:
+    """Check if a pool with the given name exists (case-insensitive)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM pools WHERE LOWER(name) = LOWER(?)", (name,))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
+
+def create_pool(name: str, created_by: str) -> str | None:
     """
-    Create a new pool and return its code.
+    Create a new pool and return its name.
+    Returns None if a pool with that name already exists.
     Also adds the creator as an admin member.
     """
+    if pool_name_exists(name):
+        return None
     code = generate_pool_code()
     conn = get_connection()
     cursor = conn.cursor()
@@ -285,7 +298,7 @@ def create_pool(name: str, created_by: str) -> str:
     )
     conn.commit()
     conn.close()
-    return code
+    return name
 
 
 def get_pool(code: str) -> dict | None:
@@ -296,6 +309,22 @@ def get_pool(code: str) -> dict | None:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT code, name, created_by FROM pools WHERE code = ?", (code,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return {"code": row["code"], "name": row["name"], "created_by": row["created_by"]}
+    return None
+
+
+def get_pool_by_name(name: str) -> dict | None:
+    """
+    Get pool info by name (case-insensitive).
+    Returns dict with code, name, created_by or None if not found.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT code, name, created_by FROM pools WHERE LOWER(name) = LOWER(?)", (name,))
     row = cursor.fetchone()
     conn.close()
 
