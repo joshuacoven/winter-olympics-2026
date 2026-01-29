@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from categories import get_all_categories, get_sports_list, get_countries, PredictionCategory
 from database import (
     create_pool, get_pool, get_pool_by_name, pool_exists, pool_name_exists,
-    create_user, user_exists, get_user_pools, add_pool_member, is_pool_admin,
+    create_user, user_exists, verify_pin, get_user_pools, add_pool_member, is_pool_admin,
     create_prediction_set, get_user_prediction_sets, get_prediction_set,
     delete_prediction_set, assign_prediction_set_to_pool, get_pool_assignment,
     save_set_prediction, get_predictions_for_set, get_category_results,
@@ -322,10 +322,21 @@ st.markdown("""
     }
 
     /* Info/Warning/Error boxes */
+    .stAlert {
+        padding: var(--space-md) !important;
+        padding-left: var(--space-md) !important;
+        margin-left: 0 !important;
+        border-radius: var(--radius-md) !important;
+        margin-bottom: var(--space-md) !important;
+        border-left: none !important;
+    }
     [data-testid="stAlert"] {
-        padding: var(--space-md);
-        border-radius: var(--radius-md);
-        margin-bottom: var(--space-md);
+        padding: var(--space-md) !important;
+        padding-left: var(--space-md) !important;
+        margin-left: 0 !important;
+        border-radius: var(--radius-md) !important;
+        margin-bottom: var(--space-md) !important;
+        border-left: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -377,26 +388,26 @@ def render_category_card(
         status_text = None
         status_color = None
 
-    # Gender tag colors
-    gender_colors = {"Men": "#0d6efd", "Women": "#d63384", "Mixed": "#6f42c1", None: "#ffc107"}
-    gender_color = gender_colors.get(category.gender, "#6c757d")
-
     with st.container(border=True):
         # Category name
         st.markdown(f"**{category.display_name}**")
 
         # Tags
-        # Gold text formatting
         gold_word = "Gold" if category.event_count == 1 else "Golds"
 
         if category.is_overall:
             tags_html = f'<span style="background-color: #ffc107; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 0.75em;">{category.event_count} Gold Medals</span>'
-        else:
+        elif category.is_featured:
             tags_html = (
+                f'<span style="background-color: #e74c3c; color: #fff; padding: 2px 8px; '
+                f'border-radius: 10px; font-size: 0.75em; margin-right: 6px;">Featured</span>'
                 f'<span style="background-color: #2c3e50; color: #fff; padding: 2px 8px; '
                 f'border-radius: 10px; font-size: 0.75em; margin-right: 6px;">{category.sport}</span>'
-                f'<span style="background-color: {gender_color}; color: white; padding: 2px 8px; '
-                f'border-radius: 10px; font-size: 0.75em; margin-right: 6px;">{category.gender}</span>'
+                f'<span style="background-color: #ffc107; color: #000; padding: 2px 8px; '
+                f'border-radius: 10px; font-size: 0.75em;">{category.event_count} {gold_word}</span>'
+            )
+        else:
+            tags_html = (
                 f'<span style="background-color: #ffc107; color: #000; padding: 2px 8px; '
                 f'border-radius: 10px; font-size: 0.75em;">{category.event_count} {gold_word}</span>'
             )
@@ -454,33 +465,41 @@ def login_page():
     st.subheader("Log In or Create an Account")
     with st.form("login"):
         username = st.text_input("Username", placeholder="Enter your username")
+        pin = st.text_input("3-digit PIN", placeholder="e.g., 123", max_chars=3)
+        st.caption("The PIN is just to prevent accidental logins to someone else's account.")
         submitted = st.form_submit_button("Continue")
 
         if submitted:
-            if username:
+            if not username:
+                st.error("Please enter a username")
+            elif not pin or not pin.isdigit() or len(pin) != 3:
+                st.error("PIN must be 3 digits")
+            else:
                 username = username.strip()
                 if not user_exists(username):
-                    create_user(username)
+                    create_user(username, pin)
                     st.success(f"Welcome, {username}! Account created.")
+                    st.session_state.user_name = username
+                    st.rerun()
                 else:
-                    st.success(f"Welcome back, {username}!")
-                st.session_state.user_name = username
-                st.rerun()
-            else:
-                st.error("Please enter a username")
+                    if verify_pin(username, pin):
+                        st.success(f"Welcome back, {username}!")
+                        st.session_state.user_name = username
+                        st.rerun()
+                    else:
+                        st.error("Incorrect PIN")
 
 
 def my_predictions_page():
     """Page for managing prediction sets."""
     st.title("My Predictions")
-    st.caption("Predict which country will win the most gold medals in each category")
 
     # Get user's prediction sets
     sets = get_user_prediction_sets(st.session_state.user_name)
 
     # Handle case with no sets
     if not sets:
-        st.info("Create a prediction set to start making predictions!")
+        st.info("Which country do you think will win the most gold medals in each category? Create a set of predictions that you can then assign to pools to compete against your friends!")
         col1, col2 = st.columns([3, 1])
         with col1:
             new_set_name = st.text_input(
@@ -543,7 +562,7 @@ def render_prediction_set_content(pred_set):
 
     # Filters and delete on one row
     st.markdown('<div class="filter-row">', unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         sport_options = ["Sport (All)"] + get_sports_list()
         sport_filter = st.selectbox(
@@ -555,23 +574,13 @@ def render_prediction_set_content(pred_set):
         if sport_filter == "Sport (All)":
             sport_filter = "All"
     with col2:
-        gender_options = ["Gender (All)", "Men", "Women", "Mixed"]
-        gender_filter = st.selectbox(
-            "Gender",
-            options=gender_options,
-            key=f"pred_gender_filter_{set_id}",
-            label_visibility="collapsed"
-        )
-        if gender_filter == "Gender (All)":
-            gender_filter = "All"
-    with col3:
         sort_by = st.selectbox(
             "Sort",
             options=["Sort: Event Date", "Sort: Alphabetical"],
             key=f"pred_sort_by_{set_id}",
             label_visibility="collapsed"
         )
-    with col4:
+    with col3:
         if st.button("Delete Set", key=f"delete_set_{set_id}", type="secondary"):
             delete_prediction_set(set_id)
             st.session_state.current_set_id = None
@@ -587,18 +596,19 @@ def render_prediction_set_content(pred_set):
     # Apply filters
     if sport_filter != "All":
         categories = [c for c in categories if c.sport == sport_filter]
-    if gender_filter != "All":
-        categories = [c for c in categories if c.gender == gender_filter]
 
     # Apply sorting
     if sort_by == "Sort: Event Date":
-        # Sort by date, but keep overall categories first
         overall = [c for c in categories if c.is_overall]
-        non_overall = [c for c in categories if not c.is_overall]
-        non_overall = sorted(non_overall, key=lambda c: c.first_event_date or datetime.max)
-        categories = overall + non_overall
+        sports = [c for c in categories if not c.is_overall and not c.is_featured]
+        featured = [c for c in categories if c.is_featured]
+        sports = sorted(sports, key=lambda c: c.first_event_date or datetime.max)
+        featured = sorted(featured, key=lambda c: c.first_event_date or datetime.max)
+        categories = overall + sports + featured
     else:  # Alphabetical
-        categories = sorted(categories, key=lambda c: c.display_name)
+        overall = [c for c in categories if c.is_overall]
+        rest = sorted([c for c in categories if not c.is_overall], key=lambda c: c.display_name)
+        categories = overall + rest
 
     # Progress
     all_categories = get_all_categories()
@@ -644,25 +654,27 @@ def pools_page():
     # Join/Create pool buttons
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("Join a Pool"):
+        with st.expander("Join a Pool", expanded=st.session_state.get("expand_join", False)):
             join_name = st.text_input("Pool Name", placeholder="Office Pool 2026", key="join_pool_name")
             if st.button("Join Pool"):
                 if join_name:
                     pool = get_pool_by_name(join_name.strip())
                     if pool:
                         add_pool_member(pool['code'], st.session_state.user_name)
+                        st.session_state.expand_join = False
                         st.success(f"Joined {pool['name']}!")
                         st.rerun()
                     else:
                         st.error("Pool not found")
 
     with col2:
-        with st.expander("Create a Pool"):
+        with st.expander("Create a Pool", expanded=st.session_state.get("expand_create", False)):
             pool_name = st.text_input("Pool Name", placeholder="Office Pool 2026", key="new_pool_name")
             if st.button("Create Pool"):
                 if pool_name:
                     result = create_pool(pool_name.strip(), st.session_state.user_name)
                     if result:
+                        st.session_state.expand_create = False
                         st.success(f"Pool '{result}' created!")
                         st.rerun()
                     else:
@@ -671,11 +683,6 @@ def pools_page():
     st.markdown("---")
 
     if not pools:
-        st.info("Join or create a pool to get started!")
-        return
-
-    if not prediction_sets:
-        st.warning("Create a prediction set first in 'My Predictions' before assigning to pools!")
         return
 
     # List pools with assignment options
@@ -683,38 +690,45 @@ def pools_page():
 
     for pool in pools:
         with st.container(border=True):
-            col1, col2, col3 = st.columns([2, 2, 1])
+            if prediction_sets:
+                col1, col2, col3 = st.columns([2, 2, 1])
+            else:
+                col1, col3 = st.columns([4, 1])
 
             with col1:
                 st.markdown(f"**{pool['name']}**")
 
-            with col2:
-                # Current assignment
-                current_assignment = get_pool_assignment(pool['code'], st.session_state.user_name)
-                set_options = {s["id"]: s["name"] for s in prediction_sets}
-                set_options[0] = "-- Select a prediction set --"
-                set_ids = [0] + list(s["id"] for s in prediction_sets)
+            if prediction_sets:
+                with col2:
+                    # Current assignment
+                    current_assignment = get_pool_assignment(pool['code'], st.session_state.user_name)
+                    set_options = {s["id"]: s["name"] for s in prediction_sets}
+                    set_options[0] = "-- Select a prediction set --"
+                    set_ids = [0] + list(s["id"] for s in prediction_sets)
 
-                current_idx = set_ids.index(current_assignment) if current_assignment in set_ids else 0
+                    current_idx = set_ids.index(current_assignment) if current_assignment in set_ids else 0
 
-                selected_set = st.selectbox(
-                    "Prediction Set",
-                    options=set_ids,
-                    format_func=lambda x: set_options.get(x, "Unknown"),
-                    index=current_idx,
-                    key=f"pool_assign_{pool['code']}",
-                    label_visibility="collapsed"
-                )
+                    selected_set = st.selectbox(
+                        "Prediction Set",
+                        options=set_ids,
+                        format_func=lambda x: set_options.get(x, "Unknown"),
+                        index=current_idx,
+                        key=f"pool_assign_{pool['code']}",
+                        label_visibility="collapsed"
+                    )
 
-                if selected_set != current_assignment and selected_set != 0:
-                    assign_prediction_set_to_pool(pool['code'], st.session_state.user_name, selected_set)
-                    st.rerun()
+                    if selected_set != current_assignment and selected_set != 0:
+                        assign_prediction_set_to_pool(pool['code'], st.session_state.user_name, selected_set)
+                        st.rerun()
 
             with col3:
                 if st.button("View", key=f"view_{pool['code']}", use_container_width=True):
                     st.session_state.pool_code = pool['code']
                     st.session_state.view_pool = True
                     st.rerun()
+
+    if pools and not prediction_sets:
+        st.caption("Create a prediction set in 'My Predictions' to assign to your pools.")
 
 
 def get_pool_data(pool_code: str):
@@ -785,54 +799,61 @@ def pool_view_page(show_header: bool = True):
     # === TOP 3 LEADERBOARD ===
     st.subheader("Top 3")
 
+    top3_html = '<div style="width: 100%;">'
+    top3_html += '<div style="display: flex; padding: 8px 0; border-bottom: 1px solid #e0e0e0;">'
+    top3_html += '<div style="flex: 1; font-weight: 600; color: #666;">Placement</div>'
+    top3_html += '<div style="flex: 3; font-weight: 600; color: #666;">User</div>'
+    top3_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Correct Picks</div>'
+    top3_html += '</div>'
+
     for i, user in enumerate(sorted_users[:3]):
         rank = i + 1
-        medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "")
         is_current = user == current_user
+        name_display = f"<strong>{user}</strong> (you)" if is_current else user
+        score_display = f"<strong>{scores[user]['correct']}</strong> / {scores[user]['total']}"
+        border = 'border-bottom: 1px solid #f0f0f0;' if i < 2 else ''
 
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            name_display = f"**{user}** (you)" if is_current else user
-            st.write(f"{medal} #{rank} {name_display}")
-        with col2:
-            st.write(f"**{scores[user]['correct']}** / {scores[user]['total']}")
+        top3_html += f'<div style="display: flex; padding: 12px 0; {border} align-items: center;">'
+        top3_html += f'<div style="flex: 1; font-weight: 700;">#{rank}</div>'
+        top3_html += f'<div style="flex: 3;">{name_display}</div>'
+        top3_html += f'<div style="flex: 2; text-align: right;">{score_display}</div>'
+        top3_html += '</div>'
 
-    # Note about full leaderboard
-    if len(sorted_users) > 3:
-        st.caption(f"*{len(sorted_users) - 3} more participants - see Leaderboard tab for full standings*")
+    top3_html += '</div>'
+    st.markdown(top3_html, unsafe_allow_html=True)
+
+    if st.button("See full standings →", type="secondary", key="go_to_leaderboard"):
+        st.session_state.view_pool = False
+        st.session_state.nav_override = "Leaderboard"
+        st.session_state.pool_code = pool['code']
+        st.rerun()
 
     # === YOUR PREDICTIONS ===
     st.markdown("---")
     st.subheader("Your Predictions")
 
     if current_user in user_predictions:
+        import pandas as pd
+
         my_predictions = user_predictions[current_user]
         made = len(my_predictions)
-        total = len(categories)
         correct = scores[current_user]["correct"] if current_user in scores else 0
 
         st.write(f"**{made}** predictions made | **{correct}** correct so far")
 
-        # Show user's predictions for locked categories
-        locked_cats = [c for c in categories if is_category_locked(c)]
-        if locked_cats:
-            st.caption(f"Showing your picks for {len(locked_cats)} locked events:")
+        # Build table with all categories
+        rows = []
+        for cat in categories:
+            pred = my_predictions.get(cat.id, "-")
+            result = results.get(cat.id, "TBD")
+            rows.append({
+                "Category": cat.display_name,
+                "Your Pick": pred,
+                "Result": result,
+            })
 
-            for cat in locked_cats[:5]:  # Show first 5
-                pred = my_predictions.get(cat.id, "-")
-                result = results.get(cat.id)
-                if result:
-                    if pred == result:
-                        st.write(f"✓ **{cat.display_name}**: {pred}")
-                    elif pred != "-":
-                        st.write(f"✗ **{cat.display_name}**: {pred} (was {result})")
-                    else:
-                        st.write(f"- **{cat.display_name}**: No pick (was {result})")
-                else:
-                    st.write(f"⏳ **{cat.display_name}**: {pred if pred != '-' else 'No pick'}")
-
-            if len(locked_cats) > 5:
-                st.caption(f"...and {len(locked_cats) - 5} more locked events")
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True)
     else:
         st.info("You haven't assigned a prediction set to this pool yet.")
 
@@ -873,6 +894,7 @@ def pool_view_page(show_header: bool = True):
         return
 
     # Build comparison table
+    import pandas as pd
     rows = []
     for cat in filtered:
         row = {"Category": cat.display_name}
@@ -881,7 +903,6 @@ def pool_view_page(show_header: bool = True):
         row["Result"] = results.get(cat.id, "TBD")
         rows.append(row)
 
-    import pandas as pd
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
@@ -900,7 +921,7 @@ def results_page():
     completed.sort(key=lambda x: x[0].last_event_date or datetime.max)
 
     # === MEDAL TALLY ===
-    st.subheader("Medal Tally")
+    st.subheader("Total Gold Medals")
 
     # Count golds by country
     gold_counts = {}
@@ -926,7 +947,7 @@ def results_page():
             with col2:
                 st.write(f"**{count}**")
     else:
-        st.info("No results yet. Check back once events are completed!")
+        st.info("Check back when events have been completed!")
 
     st.markdown("---")
 
@@ -934,7 +955,7 @@ def results_page():
     st.subheader("Event Results")
 
     if not completed:
-        st.info("No events have been completed yet.")
+        st.info("Check back when events have been completed!")
         return
 
     st.caption(f"Showing {len(completed)} completed categories")
@@ -958,13 +979,15 @@ def leaderboard_page():
         st.info("Join a pool to see leaderboards!")
         return
 
-    # Select pool
+    # Select pool - constrained width
     pool_options = {p["code"]: p["name"] for p in pools}
-    selected_pool = st.selectbox(
-        "Select Pool",
-        options=list(pool_options.keys()),
-        format_func=lambda x: pool_options[x]
-    )
+    pool_col, _ = st.columns([1, 2])
+    with pool_col:
+        selected_pool = st.selectbox(
+            "Select Pool",
+            options=list(pool_options.keys()),
+            format_func=lambda x: pool_options[x]
+        )
 
     st.session_state.pool_code = selected_pool
 
@@ -979,20 +1002,33 @@ def leaderboard_page():
     sorted_users = data["sorted_users"]
     scores = data["scores"]
 
-    # Full leaderboard
-    st.markdown("---")
+    # Spacing between dropdown and table
+    st.markdown("")
+
+    # Full leaderboard - column headers + rows rendered as single HTML block
+    leaderboard_html = '<div style="width: 100%;">'
+    leaderboard_html += '<div style="display: flex; padding: 8px 0; border-bottom: 1px solid #e0e0e0;">'
+    leaderboard_html += '<div style="flex: 1; font-weight: 600; color: #666;">Placement</div>'
+    leaderboard_html += '<div style="flex: 3; font-weight: 600; color: #666;">User</div>'
+    leaderboard_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Correct Picks</div>'
+    leaderboard_html += '</div>'
 
     for i, user in enumerate(sorted_users):
         rank = i + 1
-        medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "")
         is_current = user == current_user
+        name_display = f"<strong>{user}</strong> (you)" if is_current else user
+        score_display = f"<strong>{scores[user]['correct']}</strong> / {scores[user]['total']}"
+        border = 'border-bottom: 1px solid #f0f0f0;' if i < len(sorted_users) - 1 else ''
 
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            name_display = f"**{user}** (you)" if is_current else user
-            st.write(f"{medal} #{rank} {name_display}")
-        with col2:
-            st.write(f"**{scores[user]['correct']}** / {scores[user]['total']}")
+        leaderboard_html += f'<div style="display: flex; padding: 12px 0; {border} align-items: center;">'
+        leaderboard_html += f'<div style="flex: 1; font-weight: 700;">#{rank}</div>'
+        leaderboard_html += f'<div style="flex: 3;">{name_display}</div>'
+        leaderboard_html += f'<div style="flex: 2; text-align: right;">{score_display}</div>'
+        leaderboard_html += '</div>'
+
+    leaderboard_html += '</div>'
+    st.markdown(leaderboard_html, unsafe_allow_html=True)
+
 
 
 def main():
@@ -1020,9 +1056,14 @@ def main():
     st.sidebar.markdown("---")
 
     # Navigation
+    nav_options = ["My Predictions", "Pools", "Leaderboard", "Results"]
+    nav_override = st.session_state.pop("nav_override", None)
+    default_idx = nav_options.index(nav_override) if nav_override in nav_options else 0
+
     page = st.sidebar.radio(
         "Navigation",
-        ["My Predictions", "Pools", "Leaderboard", "Results"],
+        nav_options,
+        index=default_idx,
         label_visibility="collapsed"
     )
 

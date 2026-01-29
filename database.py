@@ -28,9 +28,16 @@ def init_db():
     # Create users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY
+            username TEXT PRIMARY KEY,
+            pin TEXT
         )
     """)
+
+    # Add pin column if it doesn't exist (migration for existing DBs)
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN pin TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     # Create pools table
     cursor.execute("""
@@ -173,12 +180,12 @@ def migrate_existing_data():
     conn.close()
 
 
-def create_user(username: str) -> bool:
-    """Create a new user. Returns True if created, False if already exists."""
+def create_user(username: str, pin: str) -> bool:
+    """Create a new user with a PIN. Returns True if created, False if already exists."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO users (username) VALUES (?)", (username,))
+        cursor.execute("INSERT INTO users (username, pin) VALUES (?, ?)", (username, pin))
         conn.commit()
         created = True
     except sqlite3.IntegrityError:
@@ -195,6 +202,18 @@ def user_exists(username: str) -> bool:
     exists = cursor.fetchone() is not None
     conn.close()
     return exists
+
+
+def verify_pin(username: str, pin: str) -> bool:
+    """Verify a user's PIN. Returns True if correct."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT pin FROM users WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return False
+    return row["pin"] == pin
 
 
 def get_user_pools(username: str) -> list[dict]:
