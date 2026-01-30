@@ -22,18 +22,46 @@ TURSO_URL = os.environ.get("TURSO_DATABASE_URL")
 TURSO_TOKEN = os.environ.get("TURSO_AUTH_TOKEN")
 
 
-def _dict_row_factory(cursor, row):
-    """Row factory that returns dicts keyed by column name."""
+_using_turso = bool(TURSO_URL and TURSO_TOKEN)
+
+
+def _row_to_dict(cursor, row):
+    """Convert a raw row tuple to a dict using cursor.description."""
+    if row is None:
+        return None
     columns = [desc[0] for desc in cursor.description]
     return dict(zip(columns, row))
 
 
+def _rows_to_dicts(cursor, rows):
+    """Convert a list of raw row tuples to dicts."""
+    if not rows:
+        return []
+    columns = [desc[0] for desc in cursor.description]
+    return [dict(zip(columns, row)) for row in rows]
+
+
+def fetchone_dict(cursor):
+    """Fetch one row as a dict (works with both SQLite and libsql)."""
+    row = cursor.fetchone()
+    if _using_turso:
+        return _row_to_dict(cursor, row)
+    return row  # sqlite3.Row already supports row["col"]
+
+
+def fetchall_dicts(cursor):
+    """Fetch all rows as dicts (works with both SQLite and libsql)."""
+    rows = cursor.fetchall()
+    if _using_turso:
+        return _rows_to_dicts(cursor, rows)
+    return rows  # sqlite3.Row already supports row["col"]
+
+
 def get_connection():
     """Get a database connection. Uses Turso if configured, else local SQLite."""
-    if TURSO_URL and TURSO_TOKEN:
+    if _using_turso:
         import libsql_experimental as libsql
         conn = libsql.connect("local.db", sync_url=TURSO_URL, auth_token=TURSO_TOKEN)
-        conn.row_factory = _dict_row_factory
         return conn
     else:
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -69,7 +97,7 @@ def init_db():
         # Add pin column if it doesn't exist (migration for existing DBs)
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN pin TEXT")
-        except sqlite3.OperationalError:
+        except (sqlite3.OperationalError, Exception):
             pass  # Column already exists
 
         # Create pools table
@@ -180,11 +208,11 @@ def migrate_existing_data():
 
         # Get all unique usernames from predictions
         cursor.execute("SELECT DISTINCT user_name FROM predictions")
-        prediction_users = [row["user_name"] for row in cursor.fetchall()]
+        prediction_users = [row["user_name"] for row in fetchall_dicts(cursor)]
 
         # Get all pool creators
         cursor.execute("SELECT DISTINCT created_by FROM pools")
-        creator_users = [row["created_by"] for row in cursor.fetchall()]
+        creator_users = [row["created_by"] for row in fetchall_dicts(cursor)]
 
         # Create users for all unique usernames
         all_users = set(prediction_users + creator_users)
@@ -196,7 +224,7 @@ def migrate_existing_data():
 
         # Add pool creators as admin members
         cursor.execute("SELECT code, created_by FROM pools")
-        pools = cursor.fetchall()
+        pools = fetchall_dicts(cursor)
         for pool in pools:
             cursor.execute(
                 "INSERT OR IGNORE INTO pool_members (pool_code, username, is_admin) VALUES (?, ?, 1)",
@@ -205,7 +233,7 @@ def migrate_existing_data():
 
         # Add users who made predictions as pool members
         cursor.execute("SELECT DISTINCT pool_code, user_name FROM predictions")
-        memberships = cursor.fetchall()
+        memberships = fetchall_dicts(cursor)
         for membership in memberships:
             cursor.execute(
                 "INSERT OR IGNORE INTO pool_members (pool_code, username, is_admin) VALUES (?, ?, 0)",
@@ -228,7 +256,9 @@ def create_user(username: str, pin: str) -> bool:
             conn.commit()
             _sync_if_turso(conn)
             return True
-        except sqlite3.IntegrityError:
+        except (sqlite3.IntegrityError, Exception) as e:
+            if "UNIQUE constraint" not in str(e) and "IntegrityError" not in type(e).__name__:
+                raise
             return False
     finally:
         conn.close()
@@ -251,7 +281,7 @@ def verify_pin(username: str, pin: str) -> bool:
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT pin FROM users WHERE username = ?", (username,))
-        row = cursor.fetchone()
+        row = fetchone_dict(cursor)
         if not row:
             return False
         return row["pin"] == pin
@@ -271,7 +301,7 @@ def get_user_pools(username: str) -> list[dict]:
             WHERE pm.username = ?
             ORDER BY p.name
         """, (username,))
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return [
             {
                 "code": row["code"],
@@ -309,7 +339,7 @@ def is_pool_admin(pool_code: str, username: str) -> bool:
             "SELECT is_admin FROM pool_members WHERE pool_code = ? AND username = ?",
             (pool_code, username)
         )
-        row = cursor.fetchone()
+        row = fetchone_dict(cursor)
         return bool(row["is_admin"]) if row else False
     finally:
         conn.close()
@@ -383,7 +413,7 @@ def get_pool(code: str) -> dict | None:
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT code, name, created_by FROM pools WHERE code = ?", (code,))
-        row = cursor.fetchone()
+        row = fetchone_dict(cursor)
         if row:
             return {"code": row["code"], "name": row["name"], "created_by": row["created_by"]}
         return None
@@ -400,7 +430,7 @@ def get_pool_by_name(name: str) -> dict | None:
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT code, name, created_by FROM pools WHERE LOWER(name) = LOWER(?)", (name,))
-        row = cursor.fetchone()
+        row = fetchone_dict(cursor)
         if row:
             return {"code": row["code"], "name": row["name"], "created_by": row["created_by"]}
         return None
@@ -439,7 +469,7 @@ def get_user_predictions(pool_code: str, user_name: str) -> dict[str, str]:
             "SELECT event_id, country FROM predictions WHERE pool_code = ? AND user_name = ?",
             (pool_code, user_name)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return {row["event_id"]: row["country"] for row in rows}
     finally:
         conn.close()
@@ -457,7 +487,7 @@ def get_all_predictions(pool_code: str) -> dict[str, dict[str, str]]:
             "SELECT user_name, event_id, country FROM predictions WHERE pool_code = ?",
             (pool_code,)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         predictions = {}
         for row in rows:
             user = row["user_name"]
@@ -478,7 +508,7 @@ def get_pool_participants(pool_code: str) -> list[str]:
             "SELECT DISTINCT user_name FROM predictions WHERE pool_code = ?",
             (pool_code,)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return [row["user_name"] for row in rows]
     finally:
         conn.close()
@@ -515,7 +545,7 @@ def get_results(pool_code: str) -> dict[str, str]:
             "SELECT event_id, country FROM results WHERE pool_code = ?",
             (pool_code,)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return {row["event_id"]: row["country"] for row in rows}
     finally:
         conn.close()
@@ -551,7 +581,9 @@ def create_prediction_set(username: str, name: str) -> int | None:
             conn.commit()
             _sync_if_turso(conn)
             return cursor.lastrowid
-        except sqlite3.IntegrityError:
+        except (sqlite3.IntegrityError, Exception) as e:
+            if "UNIQUE constraint" not in str(e) and "IntegrityError" not in type(e).__name__:
+                raise
             return None
     finally:
         conn.close()
@@ -566,7 +598,7 @@ def get_user_prediction_sets(username: str) -> list[dict]:
             "SELECT id, name, created_at FROM prediction_sets WHERE username = ? ORDER BY name",
             (username,)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return [
             {"id": row["id"], "name": row["name"], "created_at": row["created_at"]}
             for row in rows
@@ -584,7 +616,7 @@ def get_prediction_set(set_id: int) -> dict | None:
             "SELECT id, name, username, created_at FROM prediction_sets WHERE id = ?",
             (set_id,)
         )
-        row = cursor.fetchone()
+        row = fetchone_dict(cursor)
         if row:
             return {
                 "id": row["id"],
@@ -640,7 +672,7 @@ def get_pool_assignment(pool_code: str, username: str) -> int | None:
             "SELECT prediction_set_id FROM pool_prediction_set_assignments WHERE pool_code = ? AND username = ?",
             (pool_code, username)
         )
-        row = cursor.fetchone()
+        row = fetchone_dict(cursor)
         return row["prediction_set_id"] if row else None
     finally:
         conn.close()
@@ -655,7 +687,7 @@ def get_pool_assignments_for_pool(pool_code: str) -> dict[str, int]:
             "SELECT username, prediction_set_id FROM pool_prediction_set_assignments WHERE pool_code = ?",
             (pool_code,)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return {row["username"]: row["prediction_set_id"] for row in rows}
     finally:
         conn.close()
@@ -687,7 +719,7 @@ def get_predictions_for_set(prediction_set_id: int) -> dict[str, str]:
             "SELECT category_id, country FROM predictions_v2 WHERE prediction_set_id = ?",
             (prediction_set_id,)
         )
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return {row["category_id"]: row["country"] for row in rows}
     finally:
         conn.close()
@@ -699,7 +731,7 @@ def get_category_results() -> dict[str, str]:
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT category_id, winning_country FROM category_results")
-        rows = cursor.fetchall()
+        rows = fetchall_dicts(cursor)
         return {row["category_id"]: row["winning_country"] for row in rows}
     finally:
         conn.close()
