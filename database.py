@@ -92,8 +92,16 @@ def _sync_if_turso(conn):
             logger.warning("Turso sync failed", exc_info=True)
 
 
+_db_initialized = False
+
+
 def init_db():
-    """Initialize the database with required tables."""
+    """Initialize the database with required tables. Only runs once."""
+    global _db_initialized
+    if _db_initialized:
+        return
+    _db_initialized = True
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -217,6 +225,13 @@ def migrate_existing_data():
     conn = get_connection()
     try:
         cursor = conn.cursor()
+
+        # Skip migration if old predictions table is empty (nothing to migrate)
+        cursor.execute("SELECT COUNT(*) FROM predictions")
+        count_row = cursor.fetchone()
+        count = count_row[0] if isinstance(count_row, tuple) else count_row["COUNT(*)"] if count_row else 0
+        if count == 0:
+            return
 
         # Get all unique usernames from predictions
         cursor.execute("SELECT DISTINCT user_name FROM predictions")
