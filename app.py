@@ -4,19 +4,25 @@ Winter Olympics 2026 Prediction Game
 A Streamlit app for friends to predict gold medal winners and compete.
 """
 
+import os
+import time
+import logging
 import streamlit as st
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from categories import get_all_categories, get_sports_list, get_countries, PredictionCategory
+logger = logging.getLogger(__name__)
+
+from categories import get_all_categories, get_sports_list, get_countries, PredictionCategory, ANSWER_COUNTRY, ANSWER_YES_NO, ANSWER_NUMBER
 from database import (
     create_pool, get_pool, get_pool_by_name, pool_exists, pool_name_exists,
     create_user, user_exists, verify_pin, get_user_pools, add_pool_member, is_pool_admin,
     create_prediction_set, get_user_prediction_sets, get_prediction_set,
     delete_prediction_set, assign_prediction_set_to_pool, get_pool_assignment,
     save_set_prediction, get_predictions_for_set, get_category_results,
-    get_pool_assignments_for_pool
+    get_pool_assignments_for_pool, save_category_result
 )
+from scraper import update_results_from_scraper, ADMIN_ONLY_CATEGORIES
 
 # Page config
 st.set_page_config(
@@ -356,7 +362,11 @@ def is_category_locked(category: PredictionCategory) -> bool:
     if not category.first_event_date:
         return False
     rome_tz = ZoneInfo("Europe/Rome")
-    now = datetime.now(rome_tz)
+    simulate_date = os.environ.get("SIMULATE_DATE")
+    if simulate_date:
+        now = datetime.fromisoformat(simulate_date).replace(tzinfo=rome_tz)
+    else:
+        now = datetime.now(rome_tz)
     event_start = category.first_event_date.replace(tzinfo=rome_tz)
     return now >= event_start
 
@@ -402,9 +412,7 @@ def render_category_card(
                 f'<span style="background-color: #e74c3c; color: #fff; padding: 2px 8px; '
                 f'border-radius: 10px; font-size: 0.75em; margin-right: 6px;">Featured</span>'
                 f'<span style="background-color: #2c3e50; color: #fff; padding: 2px 8px; '
-                f'border-radius: 10px; font-size: 0.75em; margin-right: 6px;">{category.sport}</span>'
-                f'<span style="background-color: #ffc107; color: #000; padding: 2px 8px; '
-                f'border-radius: 10px; font-size: 0.75em;">{category.event_count} {gold_word}</span>'
+                f'border-radius: 10px; font-size: 0.75em;">{category.sport}</span>'
             )
         else:
             tags_html = (
@@ -412,8 +420,10 @@ def render_category_card(
                 f'border-radius: 10px; font-size: 0.75em;">{category.event_count} {gold_word}</span>'
             )
 
-        # Add locked tag if locked
-        if locked and not result:
+        # Add status tag
+        if result:
+            tags_html += ' <span style="background-color: #0085C7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75em;">Completed</span>'
+        elif locked:
             tags_html += ' <span style="background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75em;">Locked</span>'
 
         st.markdown(tags_html, unsafe_allow_html=True)
@@ -425,26 +435,38 @@ def render_category_card(
                 f"{format_datetime(category.last_event_date, tz_name)}"
             )
 
-        # Prediction display/dropdown
+        # Prediction display/input
         if locked:
-            # Show locked prediction (can't change)
             if prediction:
                 st.markdown(f"**Your pick:** {prediction}")
             else:
                 st.markdown("*No prediction made*", help="Event has started")
+        elif category.answer_type == ANSWER_YES_NO:
+            options = ["", "Yes", "No"]
+            current_idx = options.index(prediction) if prediction in options else 0
+            selected = st.selectbox(
+                "Prediction", options=options, index=current_idx,
+                key=card_key, label_visibility="collapsed"
+            )
+            if selected and selected != prediction:
+                on_change_callback(category.id, selected)
+        elif category.answer_type == ANSWER_NUMBER:
+            current_val = prediction or ""
+            selected = st.text_input(
+                "Prediction", value=current_val,
+                placeholder="Enter a number",
+                key=card_key, label_visibility="collapsed"
+            )
+            if selected and selected != prediction and selected.isdigit():
+                on_change_callback(category.id, selected)
         else:
-            # Editable dropdown
+            # Country dropdown (default)
             countries_with_empty = [""] + countries
             current_idx = countries_with_empty.index(prediction) if prediction in countries_with_empty else 0
-
             selected = st.selectbox(
-                "Prediction",
-                options=countries_with_empty,
-                index=current_idx,
-                key=card_key,
-                label_visibility="collapsed"
+                "Prediction", options=countries_with_empty, index=current_idx,
+                key=card_key, label_visibility="collapsed"
             )
-
             if selected and selected != prediction:
                 on_change_callback(category.id, selected)
 
@@ -474,6 +496,8 @@ def login_page():
                 st.error("Please enter a username")
             elif not pin or not pin.isdigit() or len(pin) != 3:
                 st.error("PIN must be 3 digits")
+            elif len(username.strip()) < 2 or len(username.strip()) > 30:
+                st.error("Username must be between 2 and 30 characters")
             else:
                 username = username.strip()
                 if not user_exists(username):
@@ -556,73 +580,8 @@ def my_predictions_page():
                     st.error("Please enter a name for the set")
 
 
-def render_prediction_set_content(pred_set):
-    """Render the content for a prediction set tab."""
-    set_id = pred_set["id"]
-
-    # Filters and delete on one row
-    st.markdown('<div class="filter-row">', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        sport_options = ["Sport (All)"] + get_sports_list()
-        sport_filter = st.selectbox(
-            "Sport",
-            options=sport_options,
-            key=f"pred_sport_filter_{set_id}",
-            label_visibility="collapsed"
-        )
-        if sport_filter == "Sport (All)":
-            sport_filter = "All"
-    with col2:
-        sort_by = st.selectbox(
-            "Sort",
-            options=["Sort: Event Date", "Sort: Alphabetical"],
-            key=f"pred_sort_by_{set_id}",
-            label_visibility="collapsed"
-        )
-    with col3:
-        if st.button("Delete Set", key=f"delete_set_{set_id}", type="secondary"):
-            delete_prediction_set(set_id)
-            st.session_state.current_set_id = None
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Get categories and predictions
-    categories = get_all_categories()
-    predictions = get_predictions_for_set(set_id)
-    results = get_category_results()
-    countries = get_countries()
-
-    # Apply filters
-    if sport_filter != "All":
-        categories = [c for c in categories if c.sport == sport_filter]
-
-    # Apply sorting
-    if sort_by == "Sort: Event Date":
-        overall = [c for c in categories if c.is_overall]
-        sports = [c for c in categories if not c.is_overall and not c.is_featured]
-        featured = [c for c in categories if c.is_featured]
-        sports = sorted(sports, key=lambda c: c.first_event_date or datetime.max)
-        featured = sorted(featured, key=lambda c: c.first_event_date or datetime.max)
-        categories = overall + sports + featured
-    else:  # Alphabetical
-        overall = [c for c in categories if c.is_overall]
-        rest = sorted([c for c in categories if not c.is_overall], key=lambda c: c.display_name)
-        categories = overall + rest
-
-    # Progress
-    all_categories = get_all_categories()
-    made_predictions = len(predictions)
-    total_categories = len(all_categories)
-    st.progress(made_predictions / total_categories)
-    st.write(f"**{made_predictions}** of **{total_categories}** predictions made | Showing **{len(categories)}** categories")
-
-    # Callback for saving predictions
-    def save_prediction(category_id: str, country: str):
-        save_set_prediction(set_id, category_id, country)
-        st.rerun()
-
-    # Render category cards in grid
+def render_cards_grid(categories, predictions, results, countries, tz_name, save_callback, set_id):
+    """Render a list of categories as a 3-column card grid."""
     num_cols = 3
     for i in range(0, len(categories), num_cols):
         cols = st.columns(num_cols, gap="small")
@@ -637,10 +596,85 @@ def render_prediction_set_content(pred_set):
                         prediction=prediction,
                         result=result,
                         countries=countries,
-                        tz_name=st.session_state.timezone,
-                        on_change_callback=save_prediction,
+                        tz_name=tz_name,
+                        on_change_callback=save_callback,
                         card_key=f"pred_{set_id}_{category.id}"
                     )
+
+
+def render_prediction_set_content(pred_set):
+    """Render the content for a prediction set tab."""
+    set_id = pred_set["id"]
+
+    # Get categories and predictions
+    all_categories = get_all_categories()
+    predictions = get_predictions_for_set(set_id)
+    results = get_category_results()
+    countries = get_countries()
+
+    # Split into featured and sport-level
+    featured_cats = [c for c in all_categories if c.is_featured]
+    sport_cats = [c for c in all_categories if not c.is_featured]
+
+    # Sort featured by date
+    featured_cats = sorted(featured_cats, key=lambda c: (c.first_event_date or datetime.max))
+
+    # Predictions count and Delete Set row
+    col_count, col_delete = st.columns([3, 1])
+    made_predictions = len(predictions)
+    total_categories = len(all_categories)
+    with col_count:
+        st.write(f"**{made_predictions}** of **{total_categories}** predictions made")
+    with col_delete:
+        confirm_key = f"confirm_delete_{set_id}"
+        if st.session_state.get(confirm_key):
+            col_yes, col_no = st.columns(2)
+            with col_yes:
+                if st.button("Yes, delete", key=f"yes_delete_{set_id}", type="primary"):
+                    delete_prediction_set(set_id)
+                    st.session_state.current_set_id = None
+                    st.session_state.pop(confirm_key, None)
+                    st.rerun()
+            with col_no:
+                if st.button("Cancel", key=f"cancel_delete_{set_id}", type="secondary"):
+                    st.session_state.pop(confirm_key, None)
+                    st.rerun()
+        else:
+            if st.button("Delete Set", key=f"delete_set_{set_id}", type="secondary"):
+                st.session_state[confirm_key] = True
+                st.rerun()
+
+    # Callback for saving predictions
+    def save_prediction(category_id: str, country: str):
+        save_set_prediction(set_id, category_id, country)
+        st.rerun()
+
+    # === FEATURED PREDICTIONS SECTION ===
+    st.subheader("Featured Predictions")
+    render_cards_grid(featured_cats, predictions, results, countries,
+                      st.session_state.timezone, save_prediction, set_id)
+
+    # === DIVIDER ===
+    st.markdown("---")
+
+    # === SORT for sport-level categories ===
+    sort_col, _ = st.columns([1, 3])
+    with sort_col:
+        sort_by = st.selectbox(
+            "Sort",
+            options=["Sort: Event Date", "Sort: Alphabetical"],
+            key=f"pred_sort_by_{set_id}",
+            label_visibility="collapsed"
+        )
+
+    if sort_by == "Sort: Event Date":
+        sport_cats = sorted(sport_cats, key=lambda c: c.first_event_date or datetime.max)
+    else:
+        sport_cats = sorted(sport_cats, key=lambda c: c.display_name)
+
+    # === SPORT-LEVEL CARDS ===
+    render_cards_grid(sport_cats, predictions, results, countries,
+                      st.session_state.timezone, save_prediction, set_id)
 
 
 def pools_page():
@@ -1031,12 +1065,92 @@ def leaderboard_page():
 
 
 
+def admin_page():
+    """Password-protected admin page for manually entering results."""
+    st.title("Admin - Enter Results")
+
+    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "olympics2026")
+
+    if "admin_authenticated" not in st.session_state:
+        st.session_state.admin_authenticated = False
+
+    if not st.session_state.admin_authenticated:
+        password = st.text_input("Admin Password", type="password")
+        if st.button("Login"):
+            if password == ADMIN_PASSWORD:
+                st.session_state.admin_authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
+        return
+
+    # Show all categories with current results and input fields
+    categories = get_all_categories()
+    results = get_category_results()
+    countries = get_countries()
+
+    # Sort by first_event_date
+    categories.sort(key=lambda c: c.first_event_date or datetime.max)
+
+    st.write(f"**{len(results)}** of **{len(categories)}** results entered")
+    st.markdown("---")
+
+    for cat in categories:
+        current_result = results.get(cat.id, None)
+        col1, col2, col3 = st.columns([3, 2, 1])
+
+        with col1:
+            st.markdown(f"**{cat.display_name}**")
+            st.caption(f"ID: `{cat.id}` | Type: {cat.answer_type}")
+
+        with col2:
+            if cat.answer_type == ANSWER_YES_NO:
+                options = ["", "Yes", "No"]
+                current_idx = options.index(current_result) if current_result in options else 0
+                new_val = st.selectbox(
+                    "Result", options=options, index=current_idx,
+                    key=f"admin_{cat.id}", label_visibility="collapsed"
+                )
+            elif cat.answer_type == ANSWER_NUMBER:
+                new_val = st.text_input(
+                    "Result", value=current_result or "",
+                    placeholder="Enter a number",
+                    key=f"admin_{cat.id}", label_visibility="collapsed"
+                )
+            else:
+                countries_with_empty = [""] + countries
+                current_idx = countries_with_empty.index(current_result) if current_result in countries_with_empty else 0
+                new_val = st.selectbox(
+                    "Result", options=countries_with_empty, index=current_idx,
+                    key=f"admin_{cat.id}", label_visibility="collapsed"
+                )
+
+        with col3:
+            if st.button("Save", key=f"admin_save_{cat.id}"):
+                if new_val:
+                    save_category_result(cat.id, new_val)
+                    st.rerun()
+
+        if current_result:
+            st.caption(f"Current result: **{current_result}**")
+
+
 def main():
     """Main app logic."""
     # Check if user is logged in
     if not st.session_state.user_name:
         login_page()
         return
+
+    # Run scraper at most once every 30 minutes (across all page loads)
+    if "last_scrape_time" not in st.session_state:
+        st.session_state.last_scrape_time = 0
+    if time.time() - st.session_state.last_scrape_time > 1800:
+        try:
+            update_results_from_scraper()
+            st.session_state.last_scrape_time = time.time()
+        except Exception:
+            logger.exception("Scraper failed")
 
     # Sidebar
     st.sidebar.markdown(f"**{st.session_state.user_name}**")
@@ -1055,8 +1169,12 @@ def main():
 
     st.sidebar.markdown("---")
 
-    # Navigation
+    # Navigation - add Admin if ?admin=1 in URL
     nav_options = ["My Predictions", "Pools", "Leaderboard", "Results"]
+    query_params = st.query_params
+    if query_params.get("admin") == "1":
+        nav_options.append("Admin")
+
     nav_override = st.session_state.pop("nav_override", None)
     default_idx = nav_options.index(nav_override) if nav_override in nav_options else 0
 
@@ -1087,6 +1205,8 @@ def main():
         leaderboard_page()
     elif page == "Results":
         results_page()
+    elif page == "Admin":
+        admin_page()
 
 
 if __name__ == "__main__":

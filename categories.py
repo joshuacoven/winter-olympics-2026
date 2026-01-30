@@ -7,18 +7,54 @@ plus featured individual events and an overall prediction.
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import lru_cache
 from events import get_all_events, WINTER_OLYMPICS_COUNTRIES
 
 
-# Featured events: (sport, event_name, gender, display_name)
+# Answer type constants
+ANSWER_COUNTRY = "country"    # Pick a country from dropdown
+ANSWER_YES_NO = "yes_no"      # Yes or No
+ANSWER_NUMBER = "number"      # Numeric answer
+
+# Featured event-linked bets: (sport, event_name, gender, display_name)
 FEATURED_EVENTS = [
-    ("Ice Hockey", "Men's", "Men", "Men's Ice Hockey"),
-    ("Ice Hockey", "Women's", "Women", "Women's Ice Hockey"),
-    ("Snowboard", "Men's Halfpipe", "Men", "Men's Snowboard Halfpipe"),
-    ("Snowboard", "Women's Halfpipe", "Women", "Women's Snowboard Halfpipe"),
-    ("Figure Skating", "Men's Singles", "Men", "Men's Figure Skating"),
-    ("Figure Skating", "Women's Singles", "Women", "Women's Figure Skating"),
-    ("Alpine Skiing", "Women's Downhill", "Women", "Women's Downhill"),
+    ("Ice Hockey", "Men's", "Men", "Men's Ice Hockey Gold"),
+]
+
+# Prop bets that aren't tied to a single event
+PROP_BETS = [
+    {
+        "id": "prop_vonn_gold",
+        "display_name": "Will Lindsey Vonn win a gold medal?",
+        "sport": "Alpine Skiing",
+        "answer_type": ANSWER_YES_NO,
+        "first_event_date": datetime(2026, 2, 7, 11, 0),
+        "last_event_date": datetime(2026, 2, 21, 13, 30),
+    },
+    {
+        "id": "prop_womens_figure_skating_country",
+        "display_name": "Which country wins Women's Figure Skating Singles?",
+        "sport": "Figure Skating",
+        "answer_type": ANSWER_COUNTRY,
+        "first_event_date": datetime(2026, 2, 17, 10, 0),
+        "last_event_date": datetime(2026, 2, 19, 18, 30),
+    },
+    {
+        "id": "prop_usa_figure_skating_medals",
+        "display_name": "How many total medals will Team USA win in Figure Skating?",
+        "sport": "Figure Skating",
+        "answer_type": ANSWER_NUMBER,
+        "first_event_date": datetime(2026, 2, 6, 10, 0),
+        "last_event_date": datetime(2026, 2, 19, 18, 30),
+    },
+    {
+        "id": "prop_most_individual_medals",
+        "display_name": "Which country will have the athlete who wins the most medals?",
+        "sport": "Overall",
+        "answer_type": ANSWER_COUNTRY,
+        "first_event_date": datetime(2026, 2, 6, 10, 0),
+        "last_event_date": datetime(2026, 2, 22, 16, 0),
+    },
 ]
 
 
@@ -33,11 +69,12 @@ class PredictionCategory:
     first_event_date: datetime | None
     last_event_date: datetime | None
     is_featured: bool = False
+    answer_type: str = ANSWER_COUNTRY  # "country", "yes_no", or "number"
 
     @property
     def is_overall(self) -> bool:
         """Check if this is the Overall category."""
-        return self.gender is None and self.sport == "Overall"
+        return self.id == "overall"
 
 
 def generate_categories() -> list[PredictionCategory]:
@@ -98,7 +135,21 @@ def generate_categories() -> list[PredictionCategory]:
             is_featured=True,
         ))
 
-    # === OVERALL CATEGORY ===
+    # === PROP BET CATEGORIES ===
+    for prop in PROP_BETS:
+        categories.append(PredictionCategory(
+            id=prop["id"],
+            sport=prop["sport"],
+            gender=None,
+            display_name=prop["display_name"],
+            event_count=0,
+            first_event_date=prop["first_event_date"],
+            last_event_date=prop["last_event_date"],
+            is_featured=True,
+            answer_type=prop["answer_type"],
+        ))
+
+    # === OVERALL CATEGORY (featured) ===
     total_events = len(events)
     first_overall = min(e.first_round_date for e in events)
     last_overall = max(e.gold_medal_date for e in events)
@@ -107,19 +158,20 @@ def generate_categories() -> list[PredictionCategory]:
         id="overall",
         sport="Overall",
         gender=None,
-        display_name="Most Gold Medals Overall",
+        display_name="Country with Most Gold Medals",
         event_count=total_events,
         first_event_date=first_overall,
         last_event_date=last_overall,
-        is_featured=False,
+        is_featured=True,
     ))
 
     return categories
 
 
-def get_all_categories() -> list[PredictionCategory]:
-    """Return all prediction categories."""
-    return generate_categories()
+@lru_cache(maxsize=1)
+def get_all_categories() -> tuple[PredictionCategory, ...]:
+    """Return all prediction categories (cached)."""
+    return tuple(generate_categories())
 
 
 def get_category_by_id(category_id: str) -> PredictionCategory | None:
