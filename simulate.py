@@ -75,8 +75,8 @@ def seed():
                 "SELECT id FROM prediction_sets WHERE username = ? AND name = ?",
                 (username, f"{username}'s Picks")
             )
-            row = cursor.fetchone()
-            conn.close()
+            from database import fetchone_dict
+            row = fetchone_dict(cursor)
             set_id = row["id"] if row else None
 
         if set_id:
@@ -127,17 +127,19 @@ def seed():
 
 def clean():
     """Remove all simulated data."""
+    from database import fetchone_dict, fetchall_dicts, _sync_if_turso
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Remove all category results (covers current and any stale entries from prior runs)
-    cursor.execute("DELETE FROM category_results")
+    # Remove only simulated category results (not real scraped ones)
+    for cat_id in SIMULATED_RESULTS:
+        cursor.execute("DELETE FROM category_results WHERE category_id = ?", (cat_id,))
 
     # Remove test users and their data
     for username, _ in TEST_USERS:
         # Get prediction set IDs
         cursor.execute("SELECT id FROM prediction_sets WHERE username = ?", (username,))
-        set_rows = cursor.fetchall()
+        set_rows = fetchall_dicts(cursor)
         for row in set_rows:
             cursor.execute("DELETE FROM predictions_v2 WHERE prediction_set_id = ?", (row["id"],))
             cursor.execute("DELETE FROM pool_prediction_set_assignments WHERE prediction_set_id = ?", (row["id"],))
@@ -147,14 +149,14 @@ def clean():
 
     # Remove test pool
     cursor.execute("SELECT code FROM pools WHERE name = ?", (TEST_POOL_NAME,))
-    pool_row = cursor.fetchone()
+    pool_row = fetchone_dict(cursor)
     if pool_row:
         cursor.execute("DELETE FROM pool_prediction_set_assignments WHERE pool_code = ?", (pool_row["code"],))
         cursor.execute("DELETE FROM pool_members WHERE pool_code = ?", (pool_row["code"],))
         cursor.execute("DELETE FROM pools WHERE code = ?", (pool_row["code"],))
 
     conn.commit()
-    conn.close()
+    _sync_if_turso(conn)
     print("Cleaned up all simulated data.")
 
 

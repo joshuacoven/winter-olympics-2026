@@ -1,7 +1,7 @@
 """
 Winter Olympics 2026 Milano-Cortina Events Data
 
-Contains all medal events with dates, times, and metadata.
+Contains all 116 medal events with dates, times, and metadata.
 Olympics run February 6-22, 2026.
 Times are in Europe/Rome timezone (CET/UTC+1).
 """
@@ -43,20 +43,14 @@ class Event:
         return f"{self.name}"
 
 
-# All events with schedule
+# All 116 events with schedule
 # Times are approximate based on typical Olympic scheduling
 EVENTS_DATA = [
-    # Alpine Skiing (Feb 6-22) - Cortina d'Ampezzo
-    Event("Alpine Skiing", "Men's Downhill", "Men",
-          datetime(2026, 2, 7, 11, 0), datetime(2026, 2, 7, 11, 0)),
-    Event("Alpine Skiing", "Men's Super-G", "Men",
-          datetime(2026, 2, 8, 11, 0), datetime(2026, 2, 8, 11, 0)),
-    Event("Alpine Skiing", "Men's Giant Slalom", "Men",
-          datetime(2026, 2, 15, 10, 0), datetime(2026, 2, 15, 13, 30)),
-    Event("Alpine Skiing", "Men's Slalom", "Men",
-          datetime(2026, 2, 21, 10, 0), datetime(2026, 2, 21, 13, 30)),
-    Event("Alpine Skiing", "Men's Combined", "Men",
-          datetime(2026, 2, 12, 10, 0), datetime(2026, 2, 12, 14, 0)),
+    # =========================================================================
+    # CORTINA ZONE (31 events)
+    # =========================================================================
+
+    # Alpine Skiing - Women's (5 events) - Cortina d'Ampezzo
     Event("Alpine Skiing", "Women's Downhill", "Women",
           datetime(2026, 2, 10, 11, 0), datetime(2026, 2, 10, 11, 0)),
     Event("Alpine Skiing", "Women's Super-G", "Women",
@@ -65,72 +59,10 @@ EVENTS_DATA = [
           datetime(2026, 2, 18, 10, 0), datetime(2026, 2, 18, 13, 30)),
     Event("Alpine Skiing", "Women's Slalom", "Women",
           datetime(2026, 2, 20, 10, 0), datetime(2026, 2, 20, 13, 30)),
-    Event("Alpine Skiing", "Women's Combined", "Women",
+    Event("Alpine Skiing", "Women's Team Combined", "Women",
           datetime(2026, 2, 11, 10, 0), datetime(2026, 2, 11, 14, 0)),
-    Event("Alpine Skiing", "Mixed Team Parallel", "Mixed",
-          datetime(2026, 2, 16, 10, 0), datetime(2026, 2, 16, 12, 0)),
 
-    # Biathlon (Feb 8-22) - Anterselva
-    Event("Biathlon", "Men's 10km Sprint", "Men",
-          datetime(2026, 2, 8, 14, 30), datetime(2026, 2, 8, 14, 30)),
-    Event("Biathlon", "Men's 20km Individual", "Men",
-          datetime(2026, 2, 12, 14, 30), datetime(2026, 2, 12, 14, 30)),
-    Event("Biathlon", "Men's 12.5km Pursuit", "Men",
-          datetime(2026, 2, 10, 14, 30), datetime(2026, 2, 10, 14, 30)),
-    Event("Biathlon", "Men's 15km Mass Start", "Men",
-          datetime(2026, 2, 22, 12, 30), datetime(2026, 2, 22, 12, 30)),
-    Event("Biathlon", "Men's 4x7.5km Relay", "Men",
-          datetime(2026, 2, 14, 14, 30), datetime(2026, 2, 14, 14, 30)),
-    Event("Biathlon", "Women's 7.5km Sprint", "Women",
-          datetime(2026, 2, 9, 14, 30), datetime(2026, 2, 9, 14, 30)),
-    Event("Biathlon", "Women's 15km Individual", "Women",
-          datetime(2026, 2, 11, 14, 30), datetime(2026, 2, 11, 14, 30)),
-    Event("Biathlon", "Women's 10km Pursuit", "Women",
-          datetime(2026, 2, 11, 10, 0), datetime(2026, 2, 11, 10, 0)),
-    Event("Biathlon", "Women's 12.5km Mass Start", "Women",
-          datetime(2026, 2, 21, 12, 30), datetime(2026, 2, 21, 12, 30)),
-    Event("Biathlon", "Women's 4x6km Relay", "Women",
-          datetime(2026, 2, 17, 14, 30), datetime(2026, 2, 17, 14, 30)),
-    Event("Biathlon", "Mixed Relay", "Mixed",
-          datetime(2026, 2, 8, 10, 0), datetime(2026, 2, 8, 10, 0)),
-
-    # Bobsled (Feb 14-22) - Cortina
-    Event("Bobsled", "Two-Man", "Men",
-          datetime(2026, 2, 14, 20, 0), datetime(2026, 2, 15, 20, 0)),
-    Event("Bobsled", "Four-Man", "Men",
-          datetime(2026, 2, 21, 9, 30), datetime(2026, 2, 22, 9, 30)),
-    Event("Bobsled", "Women's Monobob", "Women",
-          datetime(2026, 2, 16, 9, 30), datetime(2026, 2, 17, 9, 30)),
-    Event("Bobsled", "Women's Two-Woman", "Women",
-          datetime(2026, 2, 18, 20, 0), datetime(2026, 2, 19, 20, 0)),
-
-    # Cross-Country Skiing (Feb 7-22) - Tesero
-    Event("Cross-Country Skiing", "Men's Sprint", "Men",
-          datetime(2026, 2, 11, 12, 0), datetime(2026, 2, 11, 14, 0)),
-    Event("Cross-Country Skiing", "Men's Team Sprint", "Men",
-          datetime(2026, 2, 19, 12, 0), datetime(2026, 2, 19, 14, 0)),
-    Event("Cross-Country Skiing", "Men's 15km", "Men",
-          datetime(2026, 2, 14, 12, 0), datetime(2026, 2, 14, 12, 0)),
-    Event("Cross-Country Skiing", "Men's 30km Mass Start", "Men",
-          datetime(2026, 2, 8, 12, 0), datetime(2026, 2, 8, 12, 0)),
-    Event("Cross-Country Skiing", "Men's 50km", "Men",
-          datetime(2026, 2, 22, 10, 0), datetime(2026, 2, 22, 10, 0)),
-    Event("Cross-Country Skiing", "Men's 4x10km Relay", "Men",
-          datetime(2026, 2, 16, 10, 0), datetime(2026, 2, 16, 10, 0)),
-    Event("Cross-Country Skiing", "Women's Sprint", "Women",
-          datetime(2026, 2, 11, 11, 0), datetime(2026, 2, 11, 13, 0)),
-    Event("Cross-Country Skiing", "Women's Team Sprint", "Women",
-          datetime(2026, 2, 19, 11, 0), datetime(2026, 2, 19, 13, 0)),
-    Event("Cross-Country Skiing", "Women's 10km", "Women",
-          datetime(2026, 2, 13, 12, 0), datetime(2026, 2, 13, 12, 0)),
-    Event("Cross-Country Skiing", "Women's 20km Mass Start", "Women",
-          datetime(2026, 2, 7, 12, 0), datetime(2026, 2, 7, 12, 0)),
-    Event("Cross-Country Skiing", "Women's 30km", "Women",
-          datetime(2026, 2, 21, 10, 0), datetime(2026, 2, 21, 10, 0)),
-    Event("Cross-Country Skiing", "Women's 4x5km Relay", "Women",
-          datetime(2026, 2, 15, 10, 0), datetime(2026, 2, 15, 10, 0)),
-
-    # Curling (Feb 6-22) - Milan
+    # Curling (3 events) - Cortina
     Event("Curling", "Men's", "Men",
           datetime(2026, 2, 10, 9, 0), datetime(2026, 2, 21, 14, 30)),
     Event("Curling", "Women's", "Women",
@@ -138,161 +70,263 @@ EVENTS_DATA = [
     Event("Curling", "Mixed Doubles", "Mixed",
           datetime(2026, 2, 6, 20, 0), datetime(2026, 2, 10, 14, 30)),
 
-    # Figure Skating (Feb 6-22) - Milan
-    Event("Figure Skating", "Men's Singles", "Men",
-          datetime(2026, 2, 10, 10, 0), datetime(2026, 2, 12, 18, 30)),
-    Event("Figure Skating", "Women's Singles", "Women",
-          datetime(2026, 2, 17, 10, 0), datetime(2026, 2, 19, 18, 30)),
-    Event("Figure Skating", "Pairs", "Mixed",
-          datetime(2026, 2, 7, 18, 30), datetime(2026, 2, 9, 18, 30)),
-    Event("Figure Skating", "Ice Dance", "Mixed",
-          datetime(2026, 2, 13, 10, 0), datetime(2026, 2, 15, 18, 30)),
-    Event("Figure Skating", "Team Event", "Mixed",
-          datetime(2026, 2, 6, 10, 0), datetime(2026, 2, 8, 18, 30)),
+    # Bobsled (4 events) - Cortina
+    Event("Bobsled", "Two-Man", "Men",
+          datetime(2026, 2, 14, 20, 0), datetime(2026, 2, 15, 20, 0)),
+    Event("Bobsled", "Four-Man", "Men",
+          datetime(2026, 2, 21, 9, 30), datetime(2026, 2, 22, 9, 30)),
+    Event("Bobsled", "Women's Monobob", "Women",
+          datetime(2026, 2, 16, 9, 30), datetime(2026, 2, 17, 9, 30)),
+    Event("Bobsled", "Two-Woman", "Women",
+          datetime(2026, 2, 18, 20, 0), datetime(2026, 2, 19, 20, 0)),
 
-    # Freestyle Skiing (Feb 6-21) - Livigno & Bormio
-    Event("Freestyle Skiing", "Men's Moguls", "Men",
-          datetime(2026, 2, 7, 12, 0), datetime(2026, 2, 9, 12, 30)),
-    Event("Freestyle Skiing", "Men's Aerials", "Men",
-          datetime(2026, 2, 11, 19, 0), datetime(2026, 2, 14, 19, 30)),
-    Event("Freestyle Skiing", "Men's Ski Cross", "Men",
-          datetime(2026, 2, 19, 12, 0), datetime(2026, 2, 20, 12, 30)),
-    Event("Freestyle Skiing", "Men's Halfpipe", "Men",
-          datetime(2026, 2, 12, 10, 30), datetime(2026, 2, 14, 10, 30)),
-    Event("Freestyle Skiing", "Men's Slopestyle", "Men",
-          datetime(2026, 2, 8, 10, 30), datetime(2026, 2, 10, 10, 30)),
-    Event("Freestyle Skiing", "Men's Big Air", "Men",
-          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 11, 18, 0)),
-    Event("Freestyle Skiing", "Women's Moguls", "Women",
-          datetime(2026, 2, 6, 12, 0), datetime(2026, 2, 8, 12, 30)),
-    Event("Freestyle Skiing", "Women's Aerials", "Women",
-          datetime(2026, 2, 10, 19, 0), datetime(2026, 2, 13, 19, 30)),
-    Event("Freestyle Skiing", "Women's Ski Cross", "Women",
-          datetime(2026, 2, 18, 12, 0), datetime(2026, 2, 19, 12, 30)),
-    Event("Freestyle Skiing", "Women's Halfpipe", "Women",
-          datetime(2026, 2, 11, 10, 30), datetime(2026, 2, 13, 10, 30)),
-    Event("Freestyle Skiing", "Women's Slopestyle", "Women",
-          datetime(2026, 2, 7, 10, 30), datetime(2026, 2, 9, 10, 30)),
-    Event("Freestyle Skiing", "Women's Big Air", "Women",
-          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 10, 18, 0)),
-    Event("Freestyle Skiing", "Mixed Team Aerials", "Mixed",
-          datetime(2026, 2, 8, 19, 0), datetime(2026, 2, 8, 20, 30)),
+    # Skeleton (3 events) - Cortina
+    Event("Skeleton", "Men's", "Men",
+          datetime(2026, 2, 12, 9, 30), datetime(2026, 2, 13, 11, 30)),
+    Event("Skeleton", "Women's", "Women",
+          datetime(2026, 2, 13, 18, 0), datetime(2026, 2, 14, 20, 0)),
+    Event("Skeleton", "Mixed Team", "Mixed",
+          datetime(2026, 2, 14, 9, 30), datetime(2026, 2, 14, 12, 0)),
 
-    # Ice Hockey (Feb 6-22) - Milan
+    # Luge (5 events) - Cortina
+    Event("Luge", "Men's Singles", "Men",
+          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 8, 20, 30)),
+    Event("Luge", "Women's Singles", "Women",
+          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 10, 20, 30)),
+    Event("Luge", "Women's Doubles", "Women",
+          datetime(2026, 2, 11, 18, 30), datetime(2026, 2, 11, 20, 30)),
+    Event("Luge", "Men's Doubles", "Men",
+          datetime(2026, 2, 12, 18, 30), datetime(2026, 2, 12, 20, 30)),
+    Event("Luge", "Team Relay", "Mixed",
+          datetime(2026, 2, 13, 18, 30), datetime(2026, 2, 13, 20, 0)),
+
+    # Biathlon (11 events) - Anterselva (Cortina zone)
+    Event("Biathlon", "Mixed Relay", "Mixed",
+          datetime(2026, 2, 8, 10, 0), datetime(2026, 2, 8, 10, 0)),
+    Event("Biathlon", "Men's 20km Individual", "Men",
+          datetime(2026, 2, 12, 14, 30), datetime(2026, 2, 12, 14, 30)),
+    Event("Biathlon", "Women's 15km Individual", "Women",
+          datetime(2026, 2, 11, 14, 30), datetime(2026, 2, 11, 14, 30)),
+    Event("Biathlon", "Men's 10km Sprint", "Men",
+          datetime(2026, 2, 8, 14, 30), datetime(2026, 2, 8, 14, 30)),
+    Event("Biathlon", "Women's 7.5km Sprint", "Women",
+          datetime(2026, 2, 9, 14, 30), datetime(2026, 2, 9, 14, 30)),
+    Event("Biathlon", "Men's 12.5km Pursuit", "Men",
+          datetime(2026, 2, 10, 14, 30), datetime(2026, 2, 10, 14, 30)),
+    Event("Biathlon", "Women's 10km Pursuit", "Women",
+          datetime(2026, 2, 11, 10, 0), datetime(2026, 2, 11, 10, 0)),
+    Event("Biathlon", "Men's 4x7.5km Relay", "Men",
+          datetime(2026, 2, 14, 14, 30), datetime(2026, 2, 14, 14, 30)),
+    Event("Biathlon", "Women's 4x6km Relay", "Women",
+          datetime(2026, 2, 17, 14, 30), datetime(2026, 2, 17, 14, 30)),
+    Event("Biathlon", "Men's 15km Mass Start", "Men",
+          datetime(2026, 2, 22, 12, 30), datetime(2026, 2, 22, 12, 30)),
+    Event("Biathlon", "Women's 12.5km Mass Start", "Women",
+          datetime(2026, 2, 21, 12, 30), datetime(2026, 2, 21, 12, 30)),
+
+    # =========================================================================
+    # MILANO ZONE (30 events)
+    # =========================================================================
+
+    # Ice Hockey (2 events) - Milano
     Event("Ice Hockey", "Men's", "Men",
           datetime(2026, 2, 11, 12, 10), datetime(2026, 2, 22, 12, 10)),
     Event("Ice Hockey", "Women's", "Women",
           datetime(2026, 2, 6, 12, 10), datetime(2026, 2, 17, 12, 10)),
 
-    # Luge (Feb 7-13) - Cortina
-    Event("Luge", "Men's Singles", "Men",
-          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 8, 20, 30)),
-    Event("Luge", "Women's Singles", "Women",
-          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 10, 20, 30)),
-    Event("Luge", "Doubles", "Mixed",
-          datetime(2026, 2, 11, 18, 30), datetime(2026, 2, 11, 20, 30)),
-    Event("Luge", "Team Relay", "Mixed",
-          datetime(2026, 2, 13, 18, 30), datetime(2026, 2, 13, 20, 0)),
-
-    # Nordic Combined (Feb 9-17) - Tesero & Predazzo
-    Event("Nordic Combined", "Men's Individual Normal Hill", "Men",
-          datetime(2026, 2, 9, 10, 0), datetime(2026, 2, 9, 16, 0)),
-    Event("Nordic Combined", "Men's Individual Large Hill", "Men",
-          datetime(2026, 2, 13, 10, 0), datetime(2026, 2, 13, 16, 0)),
-    Event("Nordic Combined", "Men's Team Large Hill", "Men",
-          datetime(2026, 2, 17, 10, 0), datetime(2026, 2, 17, 16, 0)),
-
-    # Short Track Speed Skating (Feb 7-16) - Milan
-    Event("Short Track", "Men's 500m", "Men",
-          datetime(2026, 2, 15, 18, 0), datetime(2026, 2, 16, 19, 30)),
-    Event("Short Track", "Men's 1000m", "Men",
-          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 10, 19, 30)),
-    Event("Short Track", "Men's 1500m", "Men",
-          datetime(2026, 2, 8, 18, 0), datetime(2026, 2, 9, 19, 30)),
-    Event("Short Track", "Men's 5000m Relay", "Men",
-          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 14, 19, 30)),
-    Event("Short Track", "Women's 500m", "Women",
-          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 12, 19, 30)),
-    Event("Short Track", "Women's 1000m", "Women",
-          datetime(2026, 2, 14, 18, 0), datetime(2026, 2, 16, 19, 30)),
-    Event("Short Track", "Women's 1500m", "Women",
-          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 8, 19, 30)),
-    Event("Short Track", "Women's 3000m Relay", "Women",
-          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 12, 19, 30)),
-    Event("Short Track", "Mixed Team Relay", "Mixed",
-          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 7, 20, 30)),
-
-    # Skeleton (Feb 12-14) - Cortina
-    Event("Skeleton", "Men's", "Men",
-          datetime(2026, 2, 12, 9, 30), datetime(2026, 2, 13, 11, 30)),
-    Event("Skeleton", "Women's", "Women",
-          datetime(2026, 2, 13, 18, 0), datetime(2026, 2, 14, 20, 0)),
-
-    # Ski Jumping (Feb 7-17) - Predazzo
-    Event("Ski Jumping", "Men's Normal Hill", "Men",
-          datetime(2026, 2, 8, 18, 0), datetime(2026, 2, 8, 19, 30)),
-    Event("Ski Jumping", "Men's Large Hill", "Men",
-          datetime(2026, 2, 12, 18, 0), datetime(2026, 2, 12, 19, 30)),
-    Event("Ski Jumping", "Men's Team Large Hill", "Men",
-          datetime(2026, 2, 14, 18, 0), datetime(2026, 2, 14, 19, 30)),
-    Event("Ski Jumping", "Women's Normal Hill", "Women",
-          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 7, 19, 30)),
-    Event("Ski Jumping", "Mixed Team", "Mixed",
-          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 10, 19, 30)),
-
-    # Snowboard (Feb 6-21) - Livigno & Cortina
-    Event("Snowboard", "Men's Halfpipe", "Men",
-          datetime(2026, 2, 11, 9, 30), datetime(2026, 2, 13, 9, 30)),
-    Event("Snowboard", "Men's Slopestyle", "Men",
-          datetime(2026, 2, 7, 9, 30), datetime(2026, 2, 9, 9, 30)),
-    Event("Snowboard", "Men's Big Air", "Men",
-          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 10, 18, 0)),
-    Event("Snowboard", "Men's Snowboard Cross", "Men",
-          datetime(2026, 2, 18, 13, 0), datetime(2026, 2, 19, 13, 30)),
-    Event("Snowboard", "Men's Parallel Giant Slalom", "Men",
-          datetime(2026, 2, 20, 13, 0), datetime(2026, 2, 20, 14, 30)),
-    Event("Snowboard", "Women's Halfpipe", "Women",
-          datetime(2026, 2, 10, 9, 30), datetime(2026, 2, 12, 9, 30)),
-    Event("Snowboard", "Women's Slopestyle", "Women",
-          datetime(2026, 2, 6, 9, 30), datetime(2026, 2, 8, 9, 30)),
-    Event("Snowboard", "Women's Big Air", "Women",
-          datetime(2026, 2, 8, 18, 0), datetime(2026, 2, 9, 18, 0)),
-    Event("Snowboard", "Women's Snowboard Cross", "Women",
-          datetime(2026, 2, 17, 13, 0), datetime(2026, 2, 18, 13, 30)),
-    Event("Snowboard", "Women's Parallel Giant Slalom", "Women",
-          datetime(2026, 2, 20, 12, 0), datetime(2026, 2, 20, 13, 30)),
-    Event("Snowboard", "Mixed Team Snowboard Cross", "Mixed",
-          datetime(2026, 2, 21, 13, 0), datetime(2026, 2, 21, 14, 30)),
-
-    # Speed Skating (Feb 8-21) - Baselga di Piné
-    Event("Speed Skating", "Men's 500m", "Men",
-          datetime(2026, 2, 12, 16, 0), datetime(2026, 2, 12, 17, 30)),
-    Event("Speed Skating", "Men's 1000m", "Men",
-          datetime(2026, 2, 14, 16, 0), datetime(2026, 2, 14, 17, 30)),
-    Event("Speed Skating", "Men's 1500m", "Men",
-          datetime(2026, 2, 11, 14, 30), datetime(2026, 2, 11, 16, 0)),
-    Event("Speed Skating", "Men's 5000m", "Men",
-          datetime(2026, 2, 9, 15, 0), datetime(2026, 2, 9, 17, 0)),
-    Event("Speed Skating", "Men's 10000m", "Men",
-          datetime(2026, 2, 15, 15, 0), datetime(2026, 2, 15, 17, 30)),
-    Event("Speed Skating", "Men's Mass Start", "Men",
-          datetime(2026, 2, 21, 15, 0), datetime(2026, 2, 21, 16, 0)),
-    Event("Speed Skating", "Men's Team Pursuit", "Men",
-          datetime(2026, 2, 16, 16, 0), datetime(2026, 2, 17, 17, 0)),
-    Event("Speed Skating", "Women's 500m", "Women",
-          datetime(2026, 2, 13, 16, 0), datetime(2026, 2, 13, 17, 30)),
-    Event("Speed Skating", "Women's 1000m", "Women",
-          datetime(2026, 2, 16, 13, 30), datetime(2026, 2, 16, 15, 0)),
-    Event("Speed Skating", "Women's 1500m", "Women",
-          datetime(2026, 2, 10, 14, 30), datetime(2026, 2, 10, 16, 0)),
+    # Speed Skating (14 events) - Milano
     Event("Speed Skating", "Women's 3000m", "Women",
           datetime(2026, 2, 8, 15, 0), datetime(2026, 2, 8, 17, 0)),
+    Event("Speed Skating", "Men's 5000m", "Men",
+          datetime(2026, 2, 9, 15, 0), datetime(2026, 2, 9, 17, 0)),
+    Event("Speed Skating", "Women's 1500m", "Women",
+          datetime(2026, 2, 10, 14, 30), datetime(2026, 2, 10, 16, 0)),
+    Event("Speed Skating", "Men's 1000m", "Men",
+          datetime(2026, 2, 14, 16, 0), datetime(2026, 2, 14, 17, 30)),
+    Event("Speed Skating", "Women's 500m", "Women",
+          datetime(2026, 2, 13, 16, 0), datetime(2026, 2, 13, 17, 30)),
+    Event("Speed Skating", "Men's 500m", "Men",
+          datetime(2026, 2, 12, 16, 0), datetime(2026, 2, 12, 17, 30)),
+    Event("Speed Skating", "Men's 1500m", "Men",
+          datetime(2026, 2, 11, 14, 30), datetime(2026, 2, 11, 16, 0)),
+    Event("Speed Skating", "Women's 1000m", "Women",
+          datetime(2026, 2, 16, 13, 30), datetime(2026, 2, 16, 15, 0)),
+    Event("Speed Skating", "Women's Team Pursuit", "Women",
+          datetime(2026, 2, 16, 14, 0), datetime(2026, 2, 17, 15, 30)),
+    Event("Speed Skating", "Men's Team Pursuit", "Men",
+          datetime(2026, 2, 16, 16, 0), datetime(2026, 2, 17, 17, 0)),
+    Event("Speed Skating", "Men's 10000m", "Men",
+          datetime(2026, 2, 15, 15, 0), datetime(2026, 2, 15, 17, 30)),
     Event("Speed Skating", "Women's 5000m", "Women",
           datetime(2026, 2, 18, 15, 0), datetime(2026, 2, 18, 17, 0)),
     Event("Speed Skating", "Women's Mass Start", "Women",
           datetime(2026, 2, 21, 14, 0), datetime(2026, 2, 21, 15, 0)),
-    Event("Speed Skating", "Women's Team Pursuit", "Women",
-          datetime(2026, 2, 16, 14, 0), datetime(2026, 2, 17, 15, 30)),
+    Event("Speed Skating", "Men's Mass Start", "Men",
+          datetime(2026, 2, 21, 15, 0), datetime(2026, 2, 21, 16, 0)),
+
+    # Short Track Speed Skating (9 events) - Milano
+    Event("Short Track Speed Skating", "Men's 1000m", "Men",
+          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 10, 19, 30)),
+    Event("Short Track Speed Skating", "Women's 1500m", "Women",
+          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 8, 19, 30)),
+    Event("Short Track Speed Skating", "Mixed Team Relay", "Mixed",
+          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 7, 20, 30)),
+    Event("Short Track Speed Skating", "Men's 1500m", "Men",
+          datetime(2026, 2, 8, 18, 0), datetime(2026, 2, 9, 19, 30)),
+    Event("Short Track Speed Skating", "Women's 500m", "Women",
+          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 12, 19, 30)),
+    Event("Short Track Speed Skating", "Women's 1000m", "Women",
+          datetime(2026, 2, 14, 18, 0), datetime(2026, 2, 16, 19, 30)),
+    Event("Short Track Speed Skating", "Men's 500m", "Men",
+          datetime(2026, 2, 15, 18, 0), datetime(2026, 2, 16, 19, 30)),
+    Event("Short Track Speed Skating", "Women's 3000m Relay", "Women",
+          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 12, 19, 30)),
+    Event("Short Track Speed Skating", "Men's 5000m Relay", "Men",
+          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 14, 19, 30)),
+
+    # Figure Skating (5 events) - Milano
+    Event("Figure Skating", "Team Event", "Mixed",
+          datetime(2026, 2, 6, 10, 0), datetime(2026, 2, 8, 18, 30)),
+    Event("Figure Skating", "Pairs", "Mixed",
+          datetime(2026, 2, 7, 18, 30), datetime(2026, 2, 9, 18, 30)),
+    Event("Figure Skating", "Men's Singles", "Men",
+          datetime(2026, 2, 10, 10, 0), datetime(2026, 2, 12, 18, 30)),
+    Event("Figure Skating", "Ice Dance", "Mixed",
+          datetime(2026, 2, 13, 10, 0), datetime(2026, 2, 15, 18, 30)),
+    Event("Figure Skating", "Women's Singles", "Women",
+          datetime(2026, 2, 17, 10, 0), datetime(2026, 2, 19, 18, 30)),
+
+    # =========================================================================
+    # VAL DI FIEMME ZONE (21 events)
+    # =========================================================================
+
+    # Ski Jumping (6 events) - Predazzo
+    Event("Ski Jumping", "Women's Normal Hill", "Women",
+          datetime(2026, 2, 7, 18, 0), datetime(2026, 2, 7, 19, 30)),
+    Event("Ski Jumping", "Men's Normal Hill", "Men",
+          datetime(2026, 2, 8, 18, 0), datetime(2026, 2, 8, 19, 30)),
+    Event("Ski Jumping", "Mixed Team", "Mixed",
+          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 10, 19, 30)),
+    Event("Ski Jumping", "Men's Large Hill", "Men",
+          datetime(2026, 2, 12, 18, 0), datetime(2026, 2, 12, 19, 30)),
+    Event("Ski Jumping", "Women's Large Hill", "Women",
+          datetime(2026, 2, 13, 18, 0), datetime(2026, 2, 13, 19, 30)),
+    Event("Ski Jumping", "Men's Super Team", "Men",
+          datetime(2026, 2, 14, 18, 0), datetime(2026, 2, 14, 19, 30)),
+
+    # Nordic Combined (3 events) - Tesero & Predazzo
+    Event("Nordic Combined", "Men's Individual Normal Hill", "Men",
+          datetime(2026, 2, 9, 10, 0), datetime(2026, 2, 9, 16, 0)),
+    Event("Nordic Combined", "Men's Individual Large Hill", "Men",
+          datetime(2026, 2, 13, 10, 0), datetime(2026, 2, 13, 16, 0)),
+    Event("Nordic Combined", "Men's Team Sprint Large Hill", "Men",
+          datetime(2026, 2, 17, 10, 0), datetime(2026, 2, 17, 16, 0)),
+
+    # Cross-Country Skiing (12 events) - Tesero
+    Event("Cross-Country Skiing", "Women's 10km Skiathlon", "Women",
+          datetime(2026, 2, 7, 12, 0), datetime(2026, 2, 7, 12, 0)),
+    Event("Cross-Country Skiing", "Men's 10km+ Skiathlon", "Men",
+          datetime(2026, 2, 8, 12, 0), datetime(2026, 2, 8, 12, 0)),
+    Event("Cross-Country Skiing", "Women's Sprint Free", "Women",
+          datetime(2026, 2, 11, 11, 0), datetime(2026, 2, 11, 13, 0)),
+    Event("Cross-Country Skiing", "Men's Sprint Free", "Men",
+          datetime(2026, 2, 11, 12, 0), datetime(2026, 2, 11, 14, 0)),
+    Event("Cross-Country Skiing", "Men's Interval Start", "Men",
+          datetime(2026, 2, 14, 12, 0), datetime(2026, 2, 14, 12, 0)),
+    Event("Cross-Country Skiing", "Women's Interval Start", "Women",
+          datetime(2026, 2, 13, 12, 0), datetime(2026, 2, 13, 12, 0)),
+    Event("Cross-Country Skiing", "Women's 4x7.5km Relay", "Women",
+          datetime(2026, 2, 15, 10, 0), datetime(2026, 2, 15, 10, 0)),
+    Event("Cross-Country Skiing", "Men's 4x10km Relay", "Men",
+          datetime(2026, 2, 16, 10, 0), datetime(2026, 2, 16, 10, 0)),
+    Event("Cross-Country Skiing", "Women's Team Sprint Free", "Women",
+          datetime(2026, 2, 19, 11, 0), datetime(2026, 2, 19, 13, 0)),
+    Event("Cross-Country Skiing", "Men's Team Sprint Free", "Men",
+          datetime(2026, 2, 19, 12, 0), datetime(2026, 2, 19, 14, 0)),
+    Event("Cross-Country Skiing", "Men's 50km Mass Start Classic", "Men",
+          datetime(2026, 2, 22, 10, 0), datetime(2026, 2, 22, 10, 0)),
+    Event("Cross-Country Skiing", "Women's 30km Mass Start Classic", "Women",
+          datetime(2026, 2, 21, 10, 0), datetime(2026, 2, 21, 10, 0)),
+
+    # =========================================================================
+    # VALTELLINA ZONE (34 events)
+    # =========================================================================
+
+    # Freestyle Skiing (15 events) - Livigno & Bormio
+    Event("Freestyle Skiing", "Women's Moguls", "Women",
+          datetime(2026, 2, 6, 12, 0), datetime(2026, 2, 8, 12, 30)),
+    Event("Freestyle Skiing", "Men's Moguls", "Men",
+          datetime(2026, 2, 7, 12, 0), datetime(2026, 2, 9, 12, 30)),
+    Event("Freestyle Skiing", "Women's Dual Moguls", "Women",
+          datetime(2026, 2, 9, 12, 0), datetime(2026, 2, 9, 14, 0)),
+    Event("Freestyle Skiing", "Men's Dual Moguls", "Men",
+          datetime(2026, 2, 10, 12, 0), datetime(2026, 2, 10, 14, 0)),
+    Event("Freestyle Skiing", "Women's Aerials", "Women",
+          datetime(2026, 2, 10, 19, 0), datetime(2026, 2, 13, 19, 30)),
+    Event("Freestyle Skiing", "Men's Aerials", "Men",
+          datetime(2026, 2, 11, 19, 0), datetime(2026, 2, 14, 19, 30)),
+    Event("Freestyle Skiing", "Mixed Team Aerials", "Mixed",
+          datetime(2026, 2, 8, 19, 0), datetime(2026, 2, 8, 20, 30)),
+    Event("Freestyle Skiing", "Women's Freeski Big Air", "Women",
+          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 10, 18, 0)),
+    Event("Freestyle Skiing", "Men's Freeski Big Air", "Men",
+          datetime(2026, 2, 10, 18, 0), datetime(2026, 2, 11, 18, 0)),
+    Event("Freestyle Skiing", "Women's Freeski Halfpipe", "Women",
+          datetime(2026, 2, 11, 10, 30), datetime(2026, 2, 13, 10, 30)),
+    Event("Freestyle Skiing", "Men's Freeski Halfpipe", "Men",
+          datetime(2026, 2, 12, 10, 30), datetime(2026, 2, 14, 10, 30)),
+    Event("Freestyle Skiing", "Women's Freeski Slopestyle", "Women",
+          datetime(2026, 2, 7, 10, 30), datetime(2026, 2, 9, 10, 30)),
+    Event("Freestyle Skiing", "Men's Freeski Slopestyle", "Men",
+          datetime(2026, 2, 8, 10, 30), datetime(2026, 2, 10, 10, 30)),
+    Event("Freestyle Skiing", "Women's Ski Cross", "Women",
+          datetime(2026, 2, 18, 12, 0), datetime(2026, 2, 19, 12, 30)),
+    Event("Freestyle Skiing", "Men's Ski Cross", "Men",
+          datetime(2026, 2, 19, 12, 0), datetime(2026, 2, 20, 12, 30)),
+
+    # Snowboard (11 events) - Livigno
+    Event("Snowboard", "Women's Slopestyle", "Women",
+          datetime(2026, 2, 6, 9, 30), datetime(2026, 2, 8, 9, 30)),
+    Event("Snowboard", "Men's Slopestyle", "Men",
+          datetime(2026, 2, 7, 9, 30), datetime(2026, 2, 9, 9, 30)),
+    Event("Snowboard", "Women's Big Air", "Women",
+          datetime(2026, 2, 8, 18, 0), datetime(2026, 2, 9, 18, 0)),
+    Event("Snowboard", "Men's Big Air", "Men",
+          datetime(2026, 2, 9, 18, 0), datetime(2026, 2, 10, 18, 0)),
+    Event("Snowboard", "Women's Halfpipe", "Women",
+          datetime(2026, 2, 10, 9, 30), datetime(2026, 2, 12, 9, 30)),
+    Event("Snowboard", "Men's Halfpipe", "Men",
+          datetime(2026, 2, 11, 9, 30), datetime(2026, 2, 13, 9, 30)),
+    Event("Snowboard", "Women's Snowboard Cross", "Women",
+          datetime(2026, 2, 17, 13, 0), datetime(2026, 2, 18, 13, 30)),
+    Event("Snowboard", "Men's Snowboard Cross", "Men",
+          datetime(2026, 2, 18, 13, 0), datetime(2026, 2, 19, 13, 30)),
+    Event("Snowboard", "Mixed Team Snowboard Cross", "Mixed",
+          datetime(2026, 2, 21, 13, 0), datetime(2026, 2, 21, 14, 30)),
+    Event("Snowboard", "Women's PGS", "Women",
+          datetime(2026, 2, 20, 12, 0), datetime(2026, 2, 20, 13, 30)),
+    Event("Snowboard", "Men's PGS", "Men",
+          datetime(2026, 2, 20, 13, 0), datetime(2026, 2, 20, 14, 30)),
+
+    # Alpine Skiing - Men's (5 events) - Bormio (Valtellina)
+    Event("Alpine Skiing", "Men's Downhill", "Men",
+          datetime(2026, 2, 7, 11, 0), datetime(2026, 2, 7, 11, 0)),
+    Event("Alpine Skiing", "Men's Super-G", "Men",
+          datetime(2026, 2, 8, 11, 0), datetime(2026, 2, 8, 11, 0)),
+    Event("Alpine Skiing", "Men's Giant Slalom", "Men",
+          datetime(2026, 2, 15, 10, 0), datetime(2026, 2, 15, 13, 30)),
+    Event("Alpine Skiing", "Men's Slalom", "Men",
+          datetime(2026, 2, 21, 10, 0), datetime(2026, 2, 21, 13, 30)),
+    Event("Alpine Skiing", "Men's Team Combined", "Men",
+          datetime(2026, 2, 12, 10, 0), datetime(2026, 2, 12, 14, 0)),
+
+    # Ski Mountaineering (3 events) - Bormio
+    Event("Ski Mountaineering", "Women's Sprint", "Women",
+          datetime(2026, 2, 18, 10, 0), datetime(2026, 2, 18, 12, 0)),
+    Event("Ski Mountaineering", "Men's Sprint", "Men",
+          datetime(2026, 2, 18, 14, 0), datetime(2026, 2, 18, 16, 0)),
+    Event("Ski Mountaineering", "Mixed Relay", "Mixed",
+          datetime(2026, 2, 19, 10, 0), datetime(2026, 2, 19, 12, 0)),
 ]
 
 
@@ -386,3 +420,23 @@ if __name__ == "__main__":
     women = len([e for e in events if e.gender == "Women"])
     mixed = len([e for e in events if e.gender == "Mixed"])
     print(f"  Men: {men}, Women: {women}, Mixed: {mixed}")
+
+    print("\nZone breakdown:")
+    # Cortina zone sports
+    cortina = [e for e in events if e.sport in
+               ["Biathlon", "Curling", "Skeleton", "Luge", "Bobsled"]
+               or (e.sport == "Alpine Skiing" and e.gender == "Women")]
+    print(f"  Cortina zone: {len(cortina)}")
+    # Milano zone sports
+    milano = [e for e in events if e.sport in
+              ["Ice Hockey", "Speed Skating", "Short Track Speed Skating", "Figure Skating"]]
+    print(f"  Milano zone: {len(milano)}")
+    # Val di Fiemme zone sports
+    fiemme = [e for e in events if e.sport in
+              ["Ski Jumping", "Nordic Combined", "Cross-Country Skiing"]]
+    print(f"  Val di Fiemme zone: {len(fiemme)}")
+    # Valtellina zone sports
+    valtellina = [e for e in events if e.sport in
+                  ["Freestyle Skiing", "Snowboard", "Ski Mountaineering"]
+                  or (e.sport == "Alpine Skiing" and e.gender == "Men")]
+    print(f"  Valtellina zone: {len(valtellina)}")

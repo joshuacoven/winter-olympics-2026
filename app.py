@@ -362,7 +362,7 @@ def is_category_locked(category: PredictionCategory) -> bool:
     if not category.first_event_date:
         return False
     rome_tz = ZoneInfo("Europe/Rome")
-    simulate_date = os.environ.get("SIMULATE_DATE")
+    simulate_date = st.session_state.get("simulate_date") or os.environ.get("SIMULATE_DATE")
     if simulate_date:
         now = datetime.fromisoformat(simulate_date).replace(tzinfo=rome_tz)
     else:
@@ -408,12 +408,7 @@ def render_category_card(
         if category.is_overall:
             tags_html = f'<span style="background-color: #ffc107; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 0.75em;">{category.event_count} Gold Medals</span>'
         elif category.is_featured:
-            tags_html = (
-                f'<span style="background-color: #e74c3c; color: #fff; padding: 2px 8px; '
-                f'border-radius: 10px; font-size: 0.75em; margin-right: 6px;">Featured</span>'
-                f'<span style="background-color: #2c3e50; color: #fff; padding: 2px 8px; '
-                f'border-radius: 10px; font-size: 0.75em;">{category.sport}</span>'
-            )
+            tags_html = ""
         else:
             tags_html = (
                 f'<span style="background-color: #ffc107; color: #000; padding: 2px 8px; '
@@ -657,7 +652,9 @@ def render_prediction_set_content(pred_set):
     # === DIVIDER ===
     st.markdown("---")
 
-    # === SORT for sport-level categories ===
+    # === SPORT-LEVEL SECTION ===
+    st.subheader("Most Gold Medals by Sport")
+
     sort_col, _ = st.columns([1, 3])
     with sort_col:
         sort_by = st.selectbox(
@@ -1083,6 +1080,42 @@ def admin_page():
             else:
                 st.error("Incorrect password")
         return
+
+    # === Simulation controls ===
+    st.subheader("Simulation")
+
+    # Date override toggle
+    sim_active = st.toggle(
+        "Simulate date (Feb 15, 2026)",
+        value=bool(st.session_state.get("simulate_date")),
+        key="sim_date_toggle",
+    )
+    if sim_active:
+        st.session_state.simulate_date = "2026-02-15T12:00"
+        st.caption("Events before Feb 15 will appear locked.")
+    else:
+        st.session_state.simulate_date = None
+
+    sim_col1, sim_col2 = st.columns(2)
+    with sim_col1:
+        if st.button("Run Simulation", type="primary"):
+            try:
+                from simulate import seed
+                seed()
+                st.success("Simulation data seeded. Refresh to see results.")
+            except Exception as e:
+                st.error(f"Simulation failed: {e}")
+    with sim_col2:
+        if st.button("Clean Simulation Data"):
+            try:
+                from simulate import clean
+                clean()
+                st.success("Simulation data cleaned. Scraper will re-populate real results on next run.")
+                # Reset scraper timer so it re-runs soon
+                st.session_state.last_scrape_time = 0
+            except Exception as e:
+                st.error(f"Cleanup failed: {e}")
+    st.markdown("---")
 
     # Show all categories with current results and input fields
     categories = sorted(get_all_categories(), key=lambda c: c.first_event_date or datetime.max)
