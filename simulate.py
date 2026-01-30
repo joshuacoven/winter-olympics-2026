@@ -13,10 +13,9 @@ Then run the app with optional date override:
 
 import sys
 import random
+import string
 from database import (
-    get_connection, init_db, save_category_result,
-    create_user, create_prediction_set, save_set_prediction,
-    create_pool, add_pool_member, assign_prediction_set_to_pool,
+    get_connection, init_db, fetchone_dict, fetchall_dicts, _sync_if_turso,
     get_pool_by_name
 )
 from categories import get_all_categories, ANSWER_YES_NO, ANSWER_NUMBER
@@ -52,12 +51,17 @@ PRED_COUNTRIES = [
 
 
 def seed():
-    """Seed the database with simulated data."""
+    """Seed the database with simulated data. Uses batch SQL to minimize Turso syncs."""
     init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
 
     # 1. Insert results
     for cat_id, result in SIMULATED_RESULTS.items():
-        save_category_result(cat_id, result)
+        cursor.execute("""
+            INSERT INTO category_results (category_id, winning_country) VALUES (?, ?)
+            ON CONFLICT(category_id) DO UPDATE SET winning_country = excluded.winning_country
+        """, (cat_id, result))
     print(f"Inserted {len(SIMULATED_RESULTS)} category results.")
 
     # 2. Create test users with prediction sets
@@ -65,23 +69,20 @@ def seed():
     set_ids = {}
 
     for username, pin in TEST_USERS:
-        create_user(username, pin)
-        set_id = create_prediction_set(username, f"{username}'s Picks")
-        if not set_id:
-            # Already exists, look it up
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id FROM prediction_sets WHERE username = ? AND name = ?",
-                (username, f"{username}'s Picks")
-            )
-            from database import fetchone_dict
-            row = fetchone_dict(cursor)
-            set_id = row["id"] if row else None
+        cursor.execute("INSERT OR IGNORE INTO users (username, pin) VALUES (?, ?)", (username, pin))
+        cursor.execute(
+            "INSERT OR IGNORE INTO prediction_sets (username, name) VALUES (?, ?)",
+            (username, f"{username}'s Picks")
+        )
+        cursor.execute(
+            "SELECT id FROM prediction_sets WHERE username = ? AND name = ?",
+            (username, f"{username}'s Picks")
+        )
+        row = fetchone_dict(cursor)
+        set_id = row["id"] if row else None
 
         if set_id:
             set_ids[username] = set_id
-            # Generate predictions for all categories
             for cat in all_categories:
                 if cat.answer_type == ANSWER_YES_NO:
                     pred = random.choice(["Yes", "No"])
@@ -89,13 +90,14 @@ def seed():
                     pred = str(random.randint(0, 6))
                 else:
                     pred = random.choice(PRED_COUNTRIES)
-                save_set_prediction(set_id, cat.id, pred)
+                cursor.execute("""
+                    INSERT INTO predictions_v2 (prediction_set_id, category_id, country) VALUES (?, ?, ?)
+                    ON CONFLICT(prediction_set_id, category_id) DO UPDATE SET country = excluded.country
+                """, (set_id, cat.id, pred))
 
     print(f"Created {len(TEST_USERS)} test users with predictions.")
 
-    # 3. Bias predictions so scores differ:
-    #    Alice gets ~80% of resolved categories right
-    #    Bob gets ~50%, Carol ~30%, Dave ~10%
+    # 3. Bias predictions so scores differ
     accuracy = {"Alice": 0.8, "Bob": 0.5, "Carol": 0.3, "Dave": 0.1}
     for username, target_acc in accuracy.items():
         set_id = set_ids.get(username)
@@ -103,26 +105,45 @@ def seed():
             continue
         for cat_id, result in SIMULATED_RESULTS.items():
             if random.random() < target_acc:
-                save_set_prediction(set_id, cat_id, result)
+                cursor.execute("""
+                    INSERT INTO predictions_v2 (prediction_set_id, category_id, country) VALUES (?, ?, ?)
+                    ON CONFLICT(prediction_set_id, category_id) DO UPDATE SET country = excluded.country
+                """, (set_id, cat_id, result))
 
     print("Biased predictions for varied leaderboard scores.")
 
     # 4. Create pool and assign everyone
+    conn.commit()
+    _sync_if_turso(conn)
+
     pool = get_pool_by_name(TEST_POOL_NAME)
     if not pool:
-        create_pool(TEST_POOL_NAME, "Alice")
-    pool = get_pool_by_name(TEST_POOL_NAME)
+        pool_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        cursor.execute("INSERT INTO pools (code, name, created_by) VALUES (?, ?, ?)",
+                        (pool_code, TEST_POOL_NAME, "Alice"))
+        cursor.execute("INSERT INTO pool_members (pool_code, username, is_admin) VALUES (?, ?, 1)",
+                        (pool_code, "Alice"))
+        conn.commit()
+        _sync_if_turso(conn)
+        pool = get_pool_by_name(TEST_POOL_NAME)
 
     for username, _ in TEST_USERS:
-        add_pool_member(pool["code"], username)
+        cursor.execute(
+            "INSERT OR IGNORE INTO pool_members (pool_code, username, is_admin) VALUES (?, ?, 0)",
+            (pool["code"], username))
         set_id = set_ids.get(username)
         if set_id:
-            assign_prediction_set_to_pool(pool["code"], username, set_id)
+            cursor.execute("""
+                INSERT INTO pool_prediction_set_assignments (pool_code, username, prediction_set_id)
+                VALUES (?, ?, ?)
+                ON CONFLICT(pool_code, username) DO UPDATE SET prediction_set_id = excluded.prediction_set_id
+            """, (pool["code"], username, set_id))
+
+    conn.commit()
+    _sync_if_turso(conn)
 
     print(f"Created pool '{TEST_POOL_NAME}' with all test users assigned.")
-    print("\nDone! Run the app with simulated date:")
-    print("  SIMULATE_DATE=2026-02-15T12:00 streamlit run app.py")
-    print("\nLog in as Alice (PIN: 111), Bob (222), Carol (333), or Dave (444)")
+    print("\nDone! Log in as Alice (PIN: 111), Bob (222), Carol (333), or Dave (444)")
 
 
 def clean():
