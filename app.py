@@ -984,7 +984,7 @@ def results_page():
     for cat, winner in completed:
         col1, col2 = st.columns([3, 2])
         with col1:
-            st.write(f"**{cat.display_name}**")
+            st.write(cat.display_name)
         with col2:
             st.write(f"🏆 {winner}")
 
