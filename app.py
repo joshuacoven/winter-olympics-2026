@@ -898,44 +898,29 @@ def pool_view_page(show_header: bool = True):
         st.info("No events have started yet. Comparisons will appear here once events begin.")
         return
 
-    # Filter options
-    col1, col2 = st.columns(2)
-    with col1:
-        sport_filter = st.selectbox(
-            "Sport",
-            options=["All"] + get_sports_list(),
-            key="pool_sport_filter"
-        )
-    with col2:
-        gender_filter = st.selectbox(
-            "Gender",
-            options=["All", "Men", "Women", "Mixed"],
-            key="pool_gender_filter"
-        )
+    # Sort alphabetically
+    locked_categories = sorted(locked_categories, key=lambda c: c.display_name)
 
-    # Apply filters to locked categories only
-    filtered = locked_categories
-    if sport_filter != "All":
-        filtered = [c for c in filtered if c.sport == sport_filter]
-    if gender_filter != "All":
-        filtered = [c for c in filtered if c.gender == gender_filter]
+    # Expandable comparison per category
+    for cat in locked_categories:
+        result = results.get(cat.id)
+        label = f"**{cat.display_name}**"
+        if result:
+            label += f"  —  🏆 {result}"
 
-    if not filtered:
-        st.info("No locked events match your filters.")
-        return
-
-    # Build comparison table
-    import pandas as pd
-    rows = []
-    for cat in filtered:
-        row = {"Category": cat.display_name}
-        for user in data["users"]:
-            row[user] = user_predictions[user].get(cat.id, "-")
-        row["Result"] = results.get(cat.id, "TBD")
-        rows.append(row)
-
-    df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+        with st.expander(cat.display_name, expanded=False):
+            if result:
+                st.markdown(f"**Result:** 🏆 {result}")
+            for user in sorted(data["users"]):
+                pick = user_predictions[user].get(cat.id, "-")
+                if result and pick == result:
+                    icon = "✅"
+                elif result and pick != "-":
+                    icon = "❌"
+                else:
+                    icon = ""
+                is_you = " **(you)**" if user == current_user else ""
+                st.markdown(f"{icon} **{user}**{is_you} — {pick}")
 
 
 def results_page():
@@ -963,8 +948,7 @@ def results_page():
         # Sort by count descending
         sorted_countries = sorted(gold_counts.items(), key=lambda x: x[1], reverse=True)
 
-        # Display as table
-        col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns([3, 2])
         with col1:
             st.markdown("**Country**")
         with col2:
@@ -972,7 +956,7 @@ def results_page():
 
         for i, (country, count) in enumerate(sorted_countries):
             medal = {0: "🥇", 1: "🥈", 2: "🥉"}.get(i, "")
-            col1, col2 = st.columns([2, 1])
+            col1, col2 = st.columns([3, 2])
             with col1:
                 st.write(f"{medal} {country}")
             with col2:
@@ -991,11 +975,16 @@ def results_page():
 
     st.caption(f"Showing {len(completed)} completed categories")
 
+    col1, col2 = st.columns([3, 2])
+    with col1:
+        st.markdown("**Event**")
+    with col2:
+        st.markdown("**Winner**")
+
     for cat, winner in completed:
-        col1, col2 = st.columns([3, 1])
+        col1, col2 = st.columns([3, 2])
         with col1:
             st.write(f"**{cat.display_name}**")
-            st.caption(f"{cat.sport} • {cat.event_count} {'Gold' if cat.event_count == 1 else 'Golds'}")
         with col2:
             st.write(f"🏆 {winner}")
 
