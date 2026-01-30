@@ -57,18 +57,30 @@ def fetchall_dicts(cursor):
     return rows  # sqlite3.Row already supports row["col"]
 
 
+_cached_conn = None
+
+
 def get_connection():
-    """Get a database connection. Uses Turso if configured, else local SQLite."""
+    """Get a database connection. Reuses a cached connection when possible."""
+    global _cached_conn
+    if _cached_conn is not None:
+        try:
+            _cached_conn.execute("SELECT 1")
+            return _cached_conn
+        except Exception:
+            _cached_conn = None
+
     if _using_turso:
         import libsql_experimental as libsql
         conn = libsql.connect("local.db", sync_url=TURSO_URL, auth_token=TURSO_TOKEN)
-        return conn
     else:
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout = 5000")
-        return conn
+
+    _cached_conn = conn
+    return conn
 
 
 def _sync_if_turso(conn):
@@ -194,7 +206,7 @@ def init_db():
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
     # Run migration for existing data
     migrate_existing_data()
@@ -243,7 +255,7 @@ def migrate_existing_data():
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def create_user(username: str, pin: str) -> bool:
@@ -261,7 +273,7 @@ def create_user(username: str, pin: str) -> bool:
                 raise
             return False
     finally:
-        conn.close()
+        pass
 
 
 def user_exists(username: str) -> bool:
@@ -272,7 +284,7 @@ def user_exists(username: str) -> bool:
         cursor.execute("SELECT 1 FROM users WHERE username = ?", (username,))
         return cursor.fetchone() is not None
     finally:
-        conn.close()
+        pass
 
 
 def verify_pin(username: str, pin: str) -> bool:
@@ -286,7 +298,7 @@ def verify_pin(username: str, pin: str) -> bool:
             return False
         return row["pin"] == pin
     finally:
-        conn.close()
+        pass
 
 
 def get_user_pools(username: str) -> list[dict]:
@@ -312,7 +324,7 @@ def get_user_pools(username: str) -> list[dict]:
             for row in rows
         ]
     finally:
-        conn.close()
+        pass
 
 
 def add_pool_member(pool_code: str, username: str, is_admin: bool = False):
@@ -327,7 +339,7 @@ def add_pool_member(pool_code: str, username: str, is_admin: bool = False):
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def is_pool_admin(pool_code: str, username: str) -> bool:
@@ -342,7 +354,7 @@ def is_pool_admin(pool_code: str, username: str) -> bool:
         row = fetchone_dict(cursor)
         return bool(row["is_admin"]) if row else False
     finally:
-        conn.close()
+        pass
 
 
 def generate_pool_code() -> str:
@@ -362,7 +374,7 @@ def pool_exists(code: str) -> bool:
         cursor.execute("SELECT 1 FROM pools WHERE code = ?", (code,))
         return cursor.fetchone() is not None
     finally:
-        conn.close()
+        pass
 
 
 def pool_name_exists(name: str) -> bool:
@@ -373,7 +385,7 @@ def pool_name_exists(name: str) -> bool:
         cursor.execute("SELECT 1 FROM pools WHERE LOWER(name) = LOWER(?)", (name,))
         return cursor.fetchone() is not None
     finally:
-        conn.close()
+        pass
 
 
 def create_pool(name: str, created_by: str) -> str | None:
@@ -400,7 +412,7 @@ def create_pool(name: str, created_by: str) -> str | None:
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
     return name
 
 
@@ -418,7 +430,7 @@ def get_pool(code: str) -> dict | None:
             return {"code": row["code"], "name": row["name"], "created_by": row["created_by"]}
         return None
     finally:
-        conn.close()
+        pass
 
 
 def get_pool_by_name(name: str) -> dict | None:
@@ -435,7 +447,7 @@ def get_pool_by_name(name: str) -> dict | None:
             return {"code": row["code"], "name": row["name"], "created_by": row["created_by"]}
         return None
     finally:
-        conn.close()
+        pass
 
 
 def save_prediction(pool_code: str, user_name: str, event_id: str, country: str):
@@ -454,7 +466,7 @@ def save_prediction(pool_code: str, user_name: str, event_id: str, country: str)
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def get_user_predictions(pool_code: str, user_name: str) -> dict[str, str]:
@@ -472,7 +484,7 @@ def get_user_predictions(pool_code: str, user_name: str) -> dict[str, str]:
         rows = fetchall_dicts(cursor)
         return {row["event_id"]: row["country"] for row in rows}
     finally:
-        conn.close()
+        pass
 
 
 def get_all_predictions(pool_code: str) -> dict[str, dict[str, str]]:
@@ -496,7 +508,7 @@ def get_all_predictions(pool_code: str) -> dict[str, dict[str, str]]:
             predictions[user][row["event_id"]] = row["country"]
         return predictions
     finally:
-        conn.close()
+        pass
 
 
 def get_pool_participants(pool_code: str) -> list[str]:
@@ -511,7 +523,7 @@ def get_pool_participants(pool_code: str) -> list[str]:
         rows = fetchall_dicts(cursor)
         return [row["user_name"] for row in rows]
     finally:
-        conn.close()
+        pass
 
 
 def save_result(pool_code: str, event_id: str, country: str):
@@ -530,7 +542,7 @@ def save_result(pool_code: str, event_id: str, country: str):
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def get_results(pool_code: str) -> dict[str, str]:
@@ -548,7 +560,7 @@ def get_results(pool_code: str) -> dict[str, str]:
         rows = fetchall_dicts(cursor)
         return {row["event_id"]: row["country"] for row in rows}
     finally:
-        conn.close()
+        pass
 
 
 def clear_result(pool_code: str, event_id: str):
@@ -563,7 +575,7 @@ def clear_result(pool_code: str, event_id: str):
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 # ============== NEW PREDICTION SET FUNCTIONS ==============
@@ -586,7 +598,7 @@ def create_prediction_set(username: str, name: str) -> int | None:
                 raise
             return None
     finally:
-        conn.close()
+        pass
 
 
 def get_user_prediction_sets(username: str) -> list[dict]:
@@ -604,7 +616,7 @@ def get_user_prediction_sets(username: str) -> list[dict]:
             for row in rows
         ]
     finally:
-        conn.close()
+        pass
 
 
 def get_prediction_set(set_id: int) -> dict | None:
@@ -626,7 +638,7 @@ def get_prediction_set(set_id: int) -> dict | None:
             }
         return None
     finally:
-        conn.close()
+        pass
 
 
 def delete_prediction_set(set_id: int):
@@ -643,7 +655,7 @@ def delete_prediction_set(set_id: int):
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def assign_prediction_set_to_pool(pool_code: str, username: str, prediction_set_id: int):
@@ -660,7 +672,7 @@ def assign_prediction_set_to_pool(pool_code: str, username: str, prediction_set_
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def get_pool_assignment(pool_code: str, username: str) -> int | None:
@@ -675,7 +687,7 @@ def get_pool_assignment(pool_code: str, username: str) -> int | None:
         row = fetchone_dict(cursor)
         return row["prediction_set_id"] if row else None
     finally:
-        conn.close()
+        pass
 
 
 def get_pool_assignments_for_pool(pool_code: str) -> dict[str, int]:
@@ -690,7 +702,7 @@ def get_pool_assignments_for_pool(pool_code: str) -> dict[str, int]:
         rows = fetchall_dicts(cursor)
         return {row["username"]: row["prediction_set_id"] for row in rows}
     finally:
-        conn.close()
+        pass
 
 
 def save_set_prediction(prediction_set_id: int, category_id: str, country: str):
@@ -707,7 +719,7 @@ def save_set_prediction(prediction_set_id: int, category_id: str, country: str):
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 def get_predictions_for_set(prediction_set_id: int) -> dict[str, str]:
@@ -722,7 +734,7 @@ def get_predictions_for_set(prediction_set_id: int) -> dict[str, str]:
         rows = fetchall_dicts(cursor)
         return {row["category_id"]: row["country"] for row in rows}
     finally:
-        conn.close()
+        pass
 
 
 def get_category_results() -> dict[str, str]:
@@ -734,7 +746,7 @@ def get_category_results() -> dict[str, str]:
         rows = fetchall_dicts(cursor)
         return {row["category_id"]: row["winning_country"] for row in rows}
     finally:
-        conn.close()
+        pass
 
 
 def save_category_result(category_id: str, winning_country: str):
@@ -751,7 +763,7 @@ def save_category_result(category_id: str, winning_country: str):
         conn.commit()
         _sync_if_turso(conn)
     finally:
-        conn.close()
+        pass
 
 
 # Initialize database when module is imported

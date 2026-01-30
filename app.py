@@ -1085,12 +1085,9 @@ def admin_page():
         return
 
     # Show all categories with current results and input fields
-    categories = get_all_categories()
+    categories = sorted(get_all_categories(), key=lambda c: c.first_event_date or datetime.max)
     results = get_category_results()
     countries = get_countries()
-
-    # Sort by first_event_date
-    categories.sort(key=lambda c: c.first_event_date or datetime.max)
 
     st.write(f"**{len(results)}** of **{len(categories)}** results entered")
     st.markdown("---")
