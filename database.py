@@ -22,12 +22,18 @@ TURSO_URL = os.environ.get("TURSO_DATABASE_URL")
 TURSO_TOKEN = os.environ.get("TURSO_AUTH_TOKEN")
 
 
+def _dict_row_factory(cursor, row):
+    """Row factory that returns dicts keyed by column name."""
+    columns = [desc[0] for desc in cursor.description]
+    return dict(zip(columns, row))
+
+
 def get_connection():
     """Get a database connection. Uses Turso if configured, else local SQLite."""
     if TURSO_URL and TURSO_TOKEN:
         import libsql_experimental as libsql
         conn = libsql.connect("local.db", sync_url=TURSO_URL, auth_token=TURSO_TOKEN)
-        conn.row_factory = sqlite3.Row
+        conn.row_factory = _dict_row_factory
         return conn
     else:
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
