@@ -514,7 +514,6 @@ def login_page():
 def my_predictions_page():
     """Page for managing prediction sets."""
     st.title("My Predictions")
-    st.info("Which country do you think will win the most gold medals in each category? Create a set of predictions and assign it to a pool to compete against your friends!")
 
     # Get user's prediction sets
     sets = get_user_prediction_sets(st.session_state.user_name)
@@ -540,6 +539,8 @@ def my_predictions_page():
                     else:
                         st.error("A set with that name already exists")
         return
+
+    st.info("Which country do you think will win the most gold medals in each category? Create a set of predictions and assign it to a pool to compete against your friends!")
 
     # Build tab names: prediction set names + "+" for new
     tab_names = [s["name"] for s in sets] + ["➕"]
