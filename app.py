@@ -1208,16 +1208,18 @@ def main():
         st.session_state.current_page = nav_override
         st.session_state.nav_radio = nav_override
 
-    current_page = st.session_state.get("current_page", "My Predictions")
-    default_idx = nav_options.index(current_page) if current_page in nav_options else 0
-
-    page = st.sidebar.radio(
-        "Navigation",
-        nav_options,
-        index=default_idx,
+    # Only pass index on first render (when nav_radio not yet in session state)
+    radio_kwargs = dict(
+        label="Navigation",
+        options=nav_options,
         key="nav_radio",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
+    if "nav_radio" not in st.session_state:
+        current_page = st.session_state.get("current_page", "My Predictions")
+        radio_kwargs["index"] = nav_options.index(current_page) if current_page in nav_options else 0
+
+    page = st.sidebar.radio(**radio_kwargs)
 
     # Persist the selected page
     st.session_state.current_page = page
