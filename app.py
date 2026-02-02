@@ -1206,6 +1206,7 @@ def main():
     nav_override = st.session_state.pop("nav_override", None)
     if nav_override and nav_override in nav_options:
         st.session_state.current_page = nav_override
+        st.session_state.nav_radio = nav_override
 
     current_page = st.session_state.get("current_page", "My Predictions")
     default_idx = nav_options.index(current_page) if current_page in nav_options else 0
