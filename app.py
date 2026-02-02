@@ -514,13 +514,14 @@ def login_page():
 def my_predictions_page():
     """Page for managing prediction sets."""
     st.title("My Predictions")
+    st.info("Which country do you think will win the most gold medals in each category? Create a set of predictions and assign it to a pool to compete against your friends!")
 
     # Get user's prediction sets
     sets = get_user_prediction_sets(st.session_state.user_name)
 
     # Handle case with no sets
     if not sets:
-        st.info("Which country do you think will win the most gold medals in each category? Create a set of predictions that you can then assign to pools to compete against your friends!")
+        st.info("Please choose a name for your set of predictions which you will then assign to a pool to compete against your friends!")
         col1, col2 = st.columns([3, 1])
         with col1:
             new_set_name = st.text_input(
