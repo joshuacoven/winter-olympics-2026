@@ -27,10 +27,15 @@ def calculate_scores(pool_code: str) -> list[dict]:
         user_preds = predictions.get(user, {})
         correct = 0
 
-        # Count correct predictions
+        # Count correct predictions (supports ties - result may be a list)
         for event_id, predicted_country in user_preds.items():
-            if event_id in results and results[event_id] == predicted_country:
-                correct += 1
+            if event_id in results:
+                winners = results[event_id]
+                if isinstance(winners, list):
+                    if predicted_country in winners:
+                        correct += 1
+                elif predicted_country == winners:
+                    correct += 1
 
         scores.append({
             "user_name": user,
@@ -70,7 +75,8 @@ def get_user_score_details(pool_code: str, user_name: str) -> list[dict]:
         result = results.get(event_id)
 
         if result is not None and pred is not None:
-            correct = pred == result
+            winners = result if isinstance(result, list) else [result]
+            correct = pred in winners
         else:
             correct = None
 

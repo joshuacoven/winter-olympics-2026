@@ -385,7 +385,8 @@ def render_category_card(
 
     # Determine status styling
     if result:
-        if prediction and prediction == result:
+        winners = result if isinstance(result, list) else [result]
+        if prediction and prediction in winners:
             status_text = "Correct!"
             status_color = "#28a745"
         elif prediction:
@@ -467,9 +468,10 @@ def render_category_card(
 
         # Show result if available
         if result and status_color:
+            result_display = ", ".join(result) if isinstance(result, list) else result
             st.markdown(
                 f'<span style="font-size: 0.85em; color: {status_color}; font-weight: 500;">'
-                f'{result} - {status_text}</span>',
+                f'{result_display} - {status_text}</span>',
                 unsafe_allow_html=True
             )
 
@@ -779,7 +781,7 @@ def get_pool_data(pool_code: str):
     for user in users:
         correct = sum(
             1 for cat in categories
-            if cat.id in results and user_predictions[user].get(cat.id) == results[cat.id]
+            if cat.id in results and user_predictions[user].get(cat.id) in results[cat.id]
         )
         total = len(user_predictions[user])
         scores[user] = {"correct": correct, "total": total}
@@ -876,7 +878,8 @@ def pool_view_page(show_header: bool = True):
         rows = []
         for cat in categories:
             pred = my_predictions.get(cat.id, "-")
-            result = results.get(cat.id, "TBD")
+            raw_result = results.get(cat.id)
+            result = ", ".join(raw_result) if isinstance(raw_result, list) else (raw_result or "TBD")
             rows.append({
                 "Category": cat.display_name,
                 "Your Pick": pred,
@@ -910,10 +913,12 @@ def pool_view_page(show_header: bool = True):
 
         with st.expander(cat.display_name, expanded=False):
             if result:
-                st.markdown(f"**Result:** 🏆 {result}")
+                result_display = ", ".join(result) if isinstance(result, list) else result
+                st.markdown(f"**Result:** 🏆 {result_display}")
             for user in sorted(data["users"]):
                 pick = user_predictions[user].get(cat.id, "-")
-                if result and pick == result:
+                winners = result if isinstance(result, list) else [result] if result else []
+                if result and pick in winners:
                     icon = "✅"
                 elif result and pick != "-":
                     icon = "❌"
@@ -939,10 +944,12 @@ def results_page():
     # === MEDAL TALLY ===
     st.subheader("Total Gold Medals")
 
-    # Count golds by country
+    # Count golds by country (ties split event count evenly)
     gold_counts = {}
-    for cat, winner in completed:
-        gold_counts[winner] = gold_counts.get(winner, 0) + cat.event_count
+    for cat, winners in completed:
+        winner_list = winners if isinstance(winners, list) else [winners]
+        for winner in winner_list:
+            gold_counts[winner] = gold_counts.get(winner, 0) + cat.event_count
 
     if gold_counts:
         # Sort by count descending
@@ -981,12 +988,13 @@ def results_page():
     with col2:
         st.markdown("**Winner**")
 
-    for cat, winner in completed:
+    for cat, winners in completed:
         col1, col2 = st.columns([3, 2])
         with col1:
             st.write(cat.display_name)
         with col2:
-            st.write(f"🏆 {winner}")
+            display = ", ".join(winners) if isinstance(winners, list) else winners
+            st.write(f"🏆 {display}")
 
 
 def leaderboard_page():
@@ -1137,12 +1145,12 @@ def admin_page():
                     key=f"admin_{cat.id}", label_visibility="collapsed"
                 )
             else:
-                countries_with_empty = [""] + countries
-                current_idx = countries_with_empty.index(current_result) if current_result in countries_with_empty else 0
-                new_val = st.selectbox(
-                    "Result", options=countries_with_empty, index=current_idx,
+                current_winners = current_result if isinstance(current_result, list) else [current_result] if current_result else []
+                new_val_list = st.multiselect(
+                    "Result", options=countries, default=current_winners,
                     key=f"admin_{cat.id}", label_visibility="collapsed"
                 )
+                new_val = ",".join(new_val_list) if new_val_list else ""
 
         with col3:
             if st.button("Save", key=f"admin_save_{cat.id}"):
@@ -1151,7 +1159,8 @@ def admin_page():
                     st.rerun()
 
         if current_result:
-            st.caption(f"Current result: **{current_result}**")
+            display = ", ".join(current_result) if isinstance(current_result, list) else current_result
+            st.caption(f"Current result: **{display}**")
 
 
 def main():
@@ -1195,14 +1204,22 @@ def main():
         nav_options.append("Admin")
 
     nav_override = st.session_state.pop("nav_override", None)
-    default_idx = nav_options.index(nav_override) if nav_override in nav_options else 0
+    if nav_override and nav_override in nav_options:
+        st.session_state.current_page = nav_override
+
+    current_page = st.session_state.get("current_page", "My Predictions")
+    default_idx = nav_options.index(current_page) if current_page in nav_options else 0
 
     page = st.sidebar.radio(
         "Navigation",
         nav_options,
         index=default_idx,
+        key="nav_radio",
         label_visibility="collapsed"
     )
+
+    # Persist the selected page
+    st.session_state.current_page = page
 
     st.sidebar.markdown("---")
 

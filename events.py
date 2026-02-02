@@ -10,13 +10,26 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Literal
 
-# Countries that commonly compete in Winter Olympics
+# All countries competing in the 2026 Winter Olympics (93 NOCs + ROC/Russia)
 WINTER_OLYMPICS_COUNTRIES = [
-    "Austria", "Canada", "China", "Czech Republic", "Finland", "France",
-    "Germany", "Italy", "Japan", "Netherlands", "Norway", "ROC/Russia",
-    "South Korea", "Sweden", "Switzerland", "United States",
-    "Australia", "Belarus", "Belgium", "Great Britain", "Poland",
-    "Slovakia", "Slovenia", "Spain", "Ukraine"
+    "Albania", "Andorra", "Argentina", "Armenia", "Australia", "Austria",
+    "Azerbaijan", "Belgium", "Benin", "Bolivia", "Bosnia and Herzegovina",
+    "Brazil", "Bulgaria", "Canada", "Chile", "China", "Chinese Taipei",
+    "Colombia", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Ecuador",
+    "Eritrea", "Estonia", "Finland", "France", "Georgia", "Germany",
+    "Great Britain", "Greece", "Guinea-Bissau", "Haiti", "Hong Kong",
+    "Hungary", "Iceland", "India", "Individual Neutral Athletes", "Iran",
+    "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Kazakhstan", "Kenya",
+    "Kosovo", "Kyrgyzstan", "Latvia", "Lebanon", "Liechtenstein", "Lithuania",
+    "Luxembourg", "Madagascar", "Malaysia", "Malta", "Mexico", "Moldova",
+    "Monaco", "Mongolia", "Montenegro", "Morocco", "Netherlands",
+    "New Zealand", "Nigeria", "North Macedonia", "Norway", "Pakistan",
+    "Philippines", "Poland", "Portugal", "Puerto Rico", "ROC/Russia",
+    "Romania", "San Marino", "Saudi Arabia", "Serbia", "Singapore",
+    "Slovakia", "Slovenia", "South Africa", "South Korea", "Spain", "Sweden",
+    "Switzerland", "Thailand", "Trinidad and Tobago", "Turkey", "Ukraine",
+    "United Arab Emirates", "United States", "Uruguay", "Uzbekistan",
+    "Venezuela",
 ]
 
 # Gender type

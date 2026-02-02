@@ -151,8 +151,10 @@ def get_sport_gold_leader(sport_id: str) -> str | None:
     if not gold_counts:
         return None
 
-    # Return country with most golds
-    return max(gold_counts, key=gold_counts.get)
+    # Return country(ies) with most golds (comma-separated if tied)
+    max_golds = max(gold_counts.values())
+    leaders = [c for c, g in gold_counts.items() if g == max_golds]
+    return ",".join(leaders)
 
 
 def get_overall_gold_leader() -> str | None:
@@ -170,7 +172,9 @@ def get_overall_gold_leader() -> str | None:
     if not total_golds:
         return None
 
-    return max(total_golds, key=total_golds.get)
+    max_golds = max(total_golds.values())
+    leaders = [c for c, g in total_golds.items() if g == max_golds]
+    return ",".join(leaders)
 
 
 def get_event_gold_winner(sport_id: str, event_keyword: str) -> str | None:

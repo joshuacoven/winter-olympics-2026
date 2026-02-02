@@ -752,14 +752,20 @@ def get_predictions_for_set(prediction_set_id: int) -> dict[str, str]:
         pass
 
 
-def get_category_results() -> dict[str, str]:
-    """Get all category results. Returns dict of category_id -> winning_country."""
+def get_category_results() -> dict[str, list[str]]:
+    """Get all category results. Returns dict of category_id -> list of winning countries.
+
+    Supports ties: multiple winners are stored as comma-separated values in the DB.
+    """
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT category_id, winning_country FROM category_results")
         rows = fetchall_dicts(cursor)
-        return {row["category_id"]: row["winning_country"] for row in rows}
+        return {
+            row["category_id"]: [c.strip() for c in row["winning_country"].split(",")]
+            for row in rows
+        }
     finally:
         pass
 
