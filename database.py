@@ -787,5 +787,118 @@ def save_category_result(category_id: str, winning_country: str):
         pass
 
 
+# ============== ADMIN POOL MANAGEMENT FUNCTIONS ==============
+
+def get_all_pools() -> list[dict]:
+    """Get all pools."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT code, name, created_by FROM pools ORDER BY name")
+        rows = fetchall_dicts(cursor)
+        return [
+            {"code": row["code"], "name": row["name"], "created_by": row["created_by"]}
+            for row in rows
+        ]
+    finally:
+        pass
+
+
+def get_all_users_with_prediction_sets() -> list[dict]:
+    """Get all users who have prediction sets."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.username, ps.id, ps.name
+            FROM users u
+            JOIN prediction_sets ps ON u.username = ps.username
+            ORDER BY u.username, ps.name
+        """)
+        rows = fetchall_dicts(cursor)
+        # Group by username
+        users = {}
+        for row in rows:
+            if row["username"] not in users:
+                users[row["username"]] = {"username": row["username"], "sets": []}
+            users[row["username"]]["sets"].append({"id": row["id"], "name": row["name"]})
+        return list(users.values())
+    finally:
+        pass
+
+
+def get_users_not_in_pool(pool_code: str) -> list[dict]:
+    """Get users with prediction sets who are NOT in the specified pool."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT u.username
+            FROM users u
+            JOIN prediction_sets ps ON u.username = ps.username
+            WHERE u.username NOT IN (
+                SELECT username FROM pool_members WHERE pool_code = ?
+            )
+            ORDER BY u.username
+        """, (pool_code,))
+        usernames = [row["username"] for row in fetchall_dicts(cursor)]
+
+        # Get their prediction sets
+        all_users = get_all_users_with_prediction_sets()
+        return [u for u in all_users if u["username"] in usernames]
+    finally:
+        pass
+
+
+def admin_add_user_to_pool(pool_code: str, username: str, prediction_set_id: int):
+    """Add user to pool and assign their prediction set."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        # Add to pool_members (ignore if already exists)
+        cursor.execute(
+            "INSERT OR IGNORE INTO pool_members (pool_code, username, is_admin) VALUES (?, ?, 0)",
+            (pool_code, username)
+        )
+        # Assign prediction set
+        cursor.execute("""
+            INSERT INTO pool_prediction_set_assignments (pool_code, username, prediction_set_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(pool_code, username) DO UPDATE SET prediction_set_id = excluded.prediction_set_id
+        """, (pool_code, username, prediction_set_id))
+        conn.commit()
+        _sync_if_turso(conn)
+    finally:
+        pass
+
+
+def get_pool_members_with_assignments(pool_code: str) -> list[dict]:
+    """Get all pool members with their prediction set assignments."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT pm.username, pm.is_admin, psa.prediction_set_id, ps.name as set_name
+            FROM pool_members pm
+            LEFT JOIN pool_prediction_set_assignments psa
+                ON pm.pool_code = psa.pool_code AND pm.username = psa.username
+            LEFT JOIN prediction_sets ps ON psa.prediction_set_id = ps.id
+            WHERE pm.pool_code = ?
+            ORDER BY pm.username
+        """, (pool_code,))
+        rows = fetchall_dicts(cursor)
+        return [
+            {
+                "username": row["username"],
+                "is_admin": bool(row["is_admin"]),
+                "prediction_set_id": row["prediction_set_id"],
+                "set_name": row["set_name"]
+            }
+            for row in rows
+        ]
+    finally:
+        pass
+
+
 # Initialize database when module is imported
 init_db()

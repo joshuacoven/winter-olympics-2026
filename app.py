@@ -20,7 +20,9 @@ from database import (
     create_prediction_set, get_user_prediction_sets, get_prediction_set,
     delete_prediction_set, assign_prediction_set_to_pool, get_pool_assignment,
     save_set_prediction, get_predictions_for_set, get_category_results,
-    get_pool_assignments_for_pool, save_category_result
+    get_pool_assignments_for_pool, save_category_result,
+    get_all_pools, get_users_not_in_pool, admin_add_user_to_pool,
+    get_pool_members_with_assignments
 )
 from scraper import update_results_from_scraper, ADMIN_ONLY_CATEGORIES
 
@@ -1163,6 +1165,70 @@ def admin_page():
         if current_result:
             display = ", ".join(current_result) if isinstance(current_result, list) else current_result
             st.caption(f"Current result: **{display}**")
+
+    # === POOL MANAGEMENT SECTION ===
+    st.markdown("---")
+    st.subheader("Pool Management")
+
+    all_pools = get_all_pools()
+    if not all_pools:
+        st.info("No pools exist yet.")
+    else:
+        pool_options = {p["code"]: p["name"] for p in all_pools}
+        selected_pool_code = st.selectbox(
+            "Select Pool",
+            options=list(pool_options.keys()),
+            format_func=lambda x: pool_options[x],
+            key="admin_pool_select"
+        )
+
+        st.markdown("#### Add User to Pool")
+
+        # Get users not in this pool
+        available_users = get_users_not_in_pool(selected_pool_code)
+
+        if not available_users:
+            st.info("All users with prediction sets are already in this pool.")
+        else:
+            user_options = {u["username"]: u for u in available_users}
+            selected_username = st.selectbox(
+                "Select User",
+                options=list(user_options.keys()),
+                key="admin_user_select"
+            )
+
+            # Show their prediction sets
+            if selected_username:
+                user_sets = user_options[selected_username]["sets"]
+                set_options = {s["id"]: s["name"] for s in user_sets}
+                selected_set_id = st.selectbox(
+                    "Select Prediction Set",
+                    options=list(set_options.keys()),
+                    format_func=lambda x: set_options[x],
+                    key="admin_set_select"
+                )
+
+                if st.button("Add User & Assign Predictions", type="primary"):
+                    admin_add_user_to_pool(selected_pool_code, selected_username, selected_set_id)
+                    st.success(f"Added {selected_username} to {pool_options[selected_pool_code]}!")
+                    st.rerun()
+
+        # Show current pool members
+        st.markdown("#### Current Pool Members")
+        members = get_pool_members_with_assignments(selected_pool_code)
+        if members:
+            for member in members:
+                col1, col2 = st.columns([2, 3])
+                with col1:
+                    admin_badge = " (admin)" if member["is_admin"] else ""
+                    st.write(f"**{member['username']}**{admin_badge}")
+                with col2:
+                    if member["set_name"]:
+                        st.write(f"Assigned: {member['set_name']}")
+                    else:
+                        st.write("*No prediction set assigned*")
+        else:
+            st.info("No members in this pool yet.")
 
 
 def main():
