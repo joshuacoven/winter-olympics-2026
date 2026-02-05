@@ -692,7 +692,7 @@ def pools_page():
     col1, col2 = st.columns(2)
     with col1:
         with st.expander("Join a Pool", expanded=st.session_state.get("expand_join", False)):
-            join_name = st.text_input("Pool Name", placeholder="Office Pool 2026", key="join_pool_name")
+            join_name = st.text_input("Pool Name", placeholder="e.g., Office Pool 2026", key="join_pool_name")
             if st.button("Join Pool"):
                 if join_name:
                     pool = get_pool_by_name(join_name.strip())
@@ -706,7 +706,7 @@ def pools_page():
 
     with col2:
         with st.expander("Create a Pool", expanded=st.session_state.get("expand_create", False)):
-            pool_name = st.text_input("Pool Name", placeholder="Office Pool 2026", key="new_pool_name")
+            pool_name = st.text_input("Pool Name", placeholder="e.g., Office Pool 2026", key="new_pool_name")
             if st.button("Create Pool"):
                 if pool_name:
                     result = create_pool(pool_name.strip(), st.session_state.user_name)
