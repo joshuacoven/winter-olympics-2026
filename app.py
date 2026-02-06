@@ -1166,6 +1166,94 @@ def admin_page():
             display = ", ".join(current_result) if isinstance(current_result, list) else current_result
             st.caption(f"Current result: **{display}**")
 
+    # === OVERRIDE USER PREDICTIONS SECTION ===
+    st.markdown("---")
+    st.subheader("Override User Predictions")
+    st.caption("Set or change a user's prediction for any category, even if locked.")
+
+    all_users_with_sets = get_all_users_with_prediction_sets()
+    if not all_users_with_sets:
+        st.info("No users with prediction sets yet.")
+    else:
+        # Select user
+        user_options = {u["username"]: u for u in all_users_with_sets}
+        override_user = st.selectbox(
+            "User",
+            options=list(user_options.keys()),
+            key="admin_override_user"
+        )
+
+        if override_user:
+            # Select prediction set
+            user_sets = user_options[override_user]["sets"]
+            set_options = {s["id"]: s["name"] for s in user_sets}
+            override_set_id = st.selectbox(
+                "Prediction Set",
+                options=list(set_options.keys()),
+                format_func=lambda x: set_options[x],
+                key="admin_override_set"
+            )
+
+            if override_set_id:
+                # Show current predictions for this set
+                current_preds = get_predictions_for_set(override_set_id)
+
+                # Select category
+                override_categories = sorted(get_all_categories(), key=lambda c: c.first_event_date or datetime.max)
+                cat_options = {c.id: c for c in override_categories}
+                override_cat_id = st.selectbox(
+                    "Category",
+                    options=list(cat_options.keys()),
+                    format_func=lambda cid: f"{'🔒 ' if is_category_locked(cat_options[cid]) else ''}{cat_options[cid].display_name}",
+                    key="admin_override_category"
+                )
+
+                if override_cat_id:
+                    cat = cat_options[override_cat_id]
+                    current_val = current_preds.get(override_cat_id, "")
+
+                    # Show current prediction
+                    if current_val:
+                        st.caption(f"Current prediction: **{current_val}**")
+                    else:
+                        st.caption("No prediction set yet.")
+
+                    # Input based on answer type
+                    if cat.answer_type == ANSWER_YES_NO:
+                        yes_no_options = ["", "Yes", "No"]
+                        current_idx = yes_no_options.index(current_val) if current_val in yes_no_options else 0
+                        override_val = st.selectbox(
+                            "New prediction",
+                            options=yes_no_options,
+                            index=current_idx,
+                            key="admin_override_value_yesno"
+                        )
+                    elif cat.answer_type == ANSWER_NUMBER:
+                        override_val = st.text_input(
+                            "New prediction",
+                            value=current_val,
+                            placeholder="Enter a number",
+                            key="admin_override_value_number"
+                        )
+                    else:
+                        current_idx = 0
+                        if current_val and current_val in countries:
+                            current_idx = countries.index(current_val) + 1
+                        override_val = st.selectbox(
+                            "New prediction",
+                            options=[""] + countries,
+                            index=current_idx,
+                            key="admin_override_value_country"
+                        )
+
+                    if st.button("Save Prediction Override", key="admin_override_save", type="primary"):
+                        if override_val:
+                            save_set_prediction(override_set_id, override_cat_id, override_val)
+                            st.success(f"Saved prediction for {override_user}: {cat.display_name} → {override_val}")
+                            st.rerun()
+                        else:
+                            st.warning("Please select a value.")
+
     # === POOL MANAGEMENT SECTION ===
     st.markdown("---")
     st.subheader("Pool Management")
