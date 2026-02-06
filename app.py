@@ -21,8 +21,8 @@ from database import (
     delete_prediction_set, assign_prediction_set_to_pool, get_pool_assignment,
     save_set_prediction, get_predictions_for_set, get_category_results,
     get_pool_assignments_for_pool, save_category_result,
-    get_all_pools, get_users_not_in_pool, admin_add_user_to_pool,
-    get_pool_members_with_assignments
+    get_all_pools, get_all_users_with_prediction_sets, get_users_not_in_pool,
+    admin_add_user_to_pool, get_pool_members_with_assignments
 )
 from scraper import update_results_from_scraper, ADMIN_ONLY_CATEGORIES
 
