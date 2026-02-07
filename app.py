@@ -1138,15 +1138,27 @@ def results_page():
             st.subheader("Sport Categories")
             for cat in sport_cats:
                 result = results.get(cat.id)
+                wiki_section = _SPORT_TO_WIKI_SECTION.get(cat.sport)
+                sport_events = fetch_sport_event_results(wiki_section) if wiki_section else {}
+                events_completed = len(sport_events)
+
                 if result:
                     result_display = ", ".join(result) if isinstance(result, list) else result
                     status = f"🏆 {result_display}"
                 else:
-                    status = "⏳ Pending"
-
-                wiki_section = _SPORT_TO_WIKI_SECTION.get(cat.sport)
-                sport_events = fetch_sport_event_results(wiki_section) if wiki_section else {}
-                events_completed = len(sport_events)
+                    # Count golds per country from completed events to show current leader
+                    gold_counts: dict[str, int] = {}
+                    for evt_res in sport_events.values():
+                        country = evt_res.get("gold", "")
+                        if country:
+                            gold_counts[country] = gold_counts.get(country, 0) + 1
+                    if gold_counts:
+                        max_golds = max(gold_counts.values())
+                        leaders = sorted(c for c, g in gold_counts.items() if g == max_golds)
+                        leader_str = ", ".join(leaders)
+                        status = f"⏳ Leading: {leader_str}"
+                    else:
+                        status = "⏳ Pending"
 
                 label = f"{cat.display_name} — {status}  ({events_completed}/{cat.event_count} events)"
                 with st.expander(label, expanded=False):
