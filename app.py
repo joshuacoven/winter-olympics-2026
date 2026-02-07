@@ -24,7 +24,12 @@ from database import (
     get_all_pools, get_all_users_with_prediction_sets, get_users_not_in_pool,
     admin_add_user_to_pool, get_pool_members_with_assignments
 )
-from scraper import update_results_from_scraper, ADMIN_ONLY_CATEGORIES
+from scraper import (
+    update_results_from_scraper, ADMIN_ONLY_CATEGORIES,
+    fetch_medal_table, fetch_all_medalists, get_medalist_summary,
+    fetch_sport_event_results, IOC_TO_FLAG, IOC_TO_COUNTRY,
+    _WIKI_SPORT_TO_ID,
+)
 
 # Page config
 st.set_page_config(
@@ -932,73 +937,237 @@ def pool_view_page(show_header: bool = True):
                 st.markdown(f"{icon} **{user}**{is_you} — {pick}")
 
 
+# Map our sport names (from categories.py) → Wikipedia section names (from medalists page)
+_SPORT_TO_WIKI_SECTION = {
+    "Alpine Skiing": "Alpine skiing",
+    "Biathlon": "Biathlon",
+    "Bobsled": "Bobsleigh",
+    "Cross-Country Skiing": "Cross-country skiing",
+    "Curling": "Curling",
+    "Figure Skating": "Figure skating",
+    "Freestyle Skiing": "Freestyle skiing",
+    "Ice Hockey": "Ice hockey",
+    "Luge": "Luge",
+    "Nordic Combined": "Nordic combined",
+    "Short Track Speed Skating": "Short track speed skating",
+    "Skeleton": "Skeleton",
+    "Ski Jumping": "Ski jumping",
+    "Ski Mountaineering": "Ski mountaineering",
+    "Snowboard": "Snowboarding",
+    "Speed Skating": "Speed skating",
+}
+
+
+def _medal_circle(color: str, label: str) -> str:
+    """Return HTML for a small colored circle with a label."""
+    return (
+        f'<span style="display:inline-block;width:22px;height:22px;'
+        f'border-radius:50%;background:{color};text-align:center;'
+        f'line-height:22px;font-size:11px;font-weight:700;color:#fff;">'
+        f'{label}</span>'
+    )
+
+
+def _flag_for_ioc(ioc: str) -> str:
+    """Return flag emoji for an IOC code, or empty string."""
+    return IOC_TO_FLAG.get(ioc, "")
+
+
 def results_page():
-    """Show actual Olympic results with medal tally."""
+    """Show actual Olympic results with medal tally in a 3-tab layout."""
     st.title("Results")
 
-    categories = get_all_categories()
-    results = get_category_results()
+    tab_medals, tab_predictions, tab_medalists = st.tabs([
+        "Medal Table", "Prediction Results", "Medalists"
+    ])
 
-    # Get completed categories (have results)
-    completed = [(c, results[c.id]) for c in categories if c.id in results]
+    # ── Tab 1: Medal Table ──────────────────────────────────────────────
+    with tab_medals:
+        medal_table = fetch_medal_table()
+        all_medalist_rows = fetch_all_medalists()
+        completed_count = len(all_medalist_rows)
 
-    # Sort by last_event_date (completion date)
-    completed.sort(key=lambda x: x[0].last_event_date or datetime.max)
+        if not medal_table:
+            st.info("Check back when events have been completed!")
+        else:
+            # Sort toggle
+            sort_col, _ = st.columns([1, 3])
+            with sort_col:
+                sort_by = st.selectbox(
+                    "Sort by",
+                    ["Gold", "Total"],
+                    key="medal_sort",
+                    label_visibility="collapsed",
+                )
+            if sort_by == "Total":
+                medal_table = sorted(medal_table, key=lambda r: (-r["total"], -r["gold"], -r["silver"]))
 
-    # === MEDAL TALLY ===
-    st.subheader("Total Gold Medals")
+            gold_circle = _medal_circle("#F4C300", "G")
+            silver_circle = _medal_circle("#C0C0C0", "S")
+            bronze_circle = _medal_circle("#CD7F32", "B")
 
-    # Count golds by country (ties split event count evenly)
-    gold_counts = {}
-    for cat, winners in completed:
-        winner_list = winners if isinstance(winners, list) else [winners]
-        for winner in winner_list:
-            gold_counts[winner] = gold_counts.get(winner, 0) + cat.event_count
+            html = '<div style="width:100%;max-width:600px;">'
+            # Header row
+            html += (
+                '<div style="display:flex;padding:8px 0;border-bottom:2px solid #e0e0e0;'
+                'font-weight:600;color:#666;font-size:14px;">'
+                '<div style="flex:0.5;text-align:center;">#</div>'
+                '<div style="flex:3;">Country</div>'
+                f'<div style="flex:1;text-align:center;">{gold_circle}</div>'
+                f'<div style="flex:1;text-align:center;">{silver_circle}</div>'
+                f'<div style="flex:1;text-align:center;">{bronze_circle}</div>'
+                '<div style="flex:1;text-align:center;font-weight:700;">Total</div>'
+                '</div>'
+            )
+            for i, row in enumerate(medal_table):
+                rank = i + 1
+                flag = _flag_for_ioc(row["ioc"])
+                country_name = row["country"]
+                border = 'border-bottom:1px solid #f0f0f0;' if i < len(medal_table) - 1 else ''
+                bg = 'background:#f8f9fa;' if i % 2 == 1 else ''
+                html += (
+                    f'<div style="display:flex;padding:10px 0;{border}{bg}align-items:center;font-size:14px;">'
+                    f'<div style="flex:0.5;text-align:center;font-weight:700;">{rank}</div>'
+                    f'<div style="flex:3;">{flag} {country_name}</div>'
+                    f'<div style="flex:1;text-align:center;font-weight:600;">{row["gold"]}</div>'
+                    f'<div style="flex:1;text-align:center;">{row["silver"]}</div>'
+                    f'<div style="flex:1;text-align:center;">{row["bronze"]}</div>'
+                    f'<div style="flex:1;text-align:center;font-weight:700;">{row["total"]}</div>'
+                    '</div>'
+                )
+            html += '</div>'
+            st.markdown(html, unsafe_allow_html=True)
 
-    if gold_counts:
-        # Sort by count descending
-        sorted_countries = sorted(gold_counts.items(), key=lambda x: x[1], reverse=True)
+            st.caption(f"Completed events: {completed_count} of 116")
 
-        col1, col2 = st.columns([3, 2])
-        with col1:
-            st.markdown("**Country**")
-        with col2:
-            st.markdown("**Gold Medals**")
+    # ── Tab 2: Prediction Results ───────────────────────────────────────
+    with tab_predictions:
+        categories = get_all_categories()
+        results = get_category_results()
 
-        for i, (country, count) in enumerate(sorted_countries):
-            medal = {0: "🥇", 1: "🥈", 2: "🥉"}.get(i, "")
-            col1, col2 = st.columns([3, 2])
-            with col1:
-                st.write(f"{medal} {country}")
-            with col2:
-                st.write(f"**{count}**")
-    else:
-        st.info("Check back when events have been completed!")
+        # Separate into sport-level and other (featured / prop / overall)
+        sport_cats = []
+        other_cats = []
+        for cat in categories:
+            if not cat.is_featured and not cat.is_overall and cat.event_count > 1:
+                sport_cats.append(cat)
+            else:
+                other_cats.append(cat)
 
-    st.markdown("---")
+        # Sort: completed first, then by sport name
+        def _sort_key(cat):
+            has_result = cat.id in results
+            return (0 if has_result else 1, cat.sport, cat.display_name)
 
-    # === EVENT RESULTS ===
-    st.subheader("Event Results")
+        sport_cats.sort(key=_sort_key)
+        other_cats.sort(key=_sort_key)
 
-    if not completed:
-        st.info("Check back when events have been completed!")
-        return
+        if not categories:
+            st.info("No prediction categories configured.")
+        else:
+            # Sport-level categories with expanders
+            st.subheader("Sport Categories")
+            for cat in sport_cats:
+                result = results.get(cat.id)
+                if result:
+                    result_display = ", ".join(result) if isinstance(result, list) else result
+                    status = f"🏆 {result_display}"
+                else:
+                    status = "⏳ Pending"
 
-    st.caption(f"Showing {len(completed)} completed categories")
+                wiki_section = _SPORT_TO_WIKI_SECTION.get(cat.sport)
+                sport_events = fetch_sport_event_results(wiki_section) if wiki_section else {}
+                events_completed = len(sport_events)
 
-    col1, col2 = st.columns([3, 2])
-    with col1:
-        st.markdown("**Event**")
-    with col2:
-        st.markdown("**Winner**")
+                label = f"{cat.display_name} — {status}  ({events_completed}/{cat.event_count} events)"
+                with st.expander(label, expanded=False):
+                    if sport_events:
+                        # Build HTML table of individual event results
+                        evt_html = '<div style="width:100%;">'
+                        for evt_name, evt_res in sorted(sport_events.items()):
+                            gold_c = evt_res["gold"]
+                            silver_c = evt_res["silver"]
+                            bronze_c = evt_res["bronze"]
+                            evt_html += (
+                                f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;">'
+                                f'<div style="flex:3;">{evt_name}</div>'
+                                f'<div style="flex:2;">🥇 {gold_c}</div>'
+                                f'<div style="flex:2;">🥈 {silver_c}</div>'
+                                f'<div style="flex:2;">🥉 {bronze_c}</div>'
+                                '</div>'
+                            )
+                        evt_html += '</div>'
+                        st.markdown(evt_html, unsafe_allow_html=True)
+                    else:
+                        st.caption("No event results available yet.")
 
-    for cat, winners in completed:
-        col1, col2 = st.columns([3, 2])
-        with col1:
-            st.write(cat.display_name)
-        with col2:
-            display = ", ".join(winners) if isinstance(winners, list) else winners
-            st.write(f"🏆 {display}")
+            # Featured / prop / overall categories
+            if other_cats:
+                st.subheader("Featured & Prop Bets")
+                for cat in other_cats:
+                    result = results.get(cat.id)
+                    if result:
+                        result_display = ", ".join(result) if isinstance(result, list) else result
+                        icon = "✅"
+                        result_text = f"🏆 {result_display}"
+                    else:
+                        icon = "⏳"
+                        result_text = "Pending"
+                    st.markdown(
+                        f"{icon} **{cat.display_name}** — {result_text}"
+                    )
+
+    # ── Tab 3: Medalists ────────────────────────────────────────────────
+    with tab_medalists:
+        summary = get_medalist_summary()
+
+        if not summary:
+            st.info("Check back when events have been completed!")
+        else:
+            # Sort toggle
+            sort_col2, _ = st.columns([1, 3])
+            with sort_col2:
+                sort_by2 = st.selectbox(
+                    "Sort by",
+                    ["Total", "Gold"],
+                    key="medalist_sort",
+                    label_visibility="collapsed",
+                )
+            if sort_by2 == "Gold":
+                summary = sorted(summary, key=lambda r: (-r["gold"], -r["total"], r["athlete"]))
+
+            gold_circle = _medal_circle("#F4C300", "G")
+            silver_circle = _medal_circle("#C0C0C0", "S")
+            bronze_circle = _medal_circle("#CD7F32", "B")
+
+            html = '<div style="width:100%;max-width:700px;">'
+            html += (
+                '<div style="display:flex;padding:8px 0;border-bottom:2px solid #e0e0e0;'
+                'font-weight:600;color:#666;font-size:14px;">'
+                '<div style="flex:2;">Country</div>'
+                '<div style="flex:3;">Athlete</div>'
+                f'<div style="flex:1;text-align:center;">{gold_circle}</div>'
+                f'<div style="flex:1;text-align:center;">{silver_circle}</div>'
+                f'<div style="flex:1;text-align:center;">{bronze_circle}</div>'
+                '<div style="flex:1;text-align:center;font-weight:700;">Total</div>'
+                '</div>'
+            )
+            for i, row in enumerate(summary):
+                flag = _flag_for_ioc(row["ioc"])
+                border = 'border-bottom:1px solid #f0f0f0;' if i < len(summary) - 1 else ''
+                bg = 'background:#f8f9fa;' if i % 2 == 1 else ''
+                html += (
+                    f'<div style="display:flex;padding:10px 0;{border}{bg}align-items:center;font-size:14px;">'
+                    f'<div style="flex:2;">{flag} {row["country"]}</div>'
+                    f'<div style="flex:3;font-weight:500;">{row["athlete"]}</div>'
+                    f'<div style="flex:1;text-align:center;font-weight:600;">{row["gold"]}</div>'
+                    f'<div style="flex:1;text-align:center;">{row["silver"]}</div>'
+                    f'<div style="flex:1;text-align:center;">{row["bronze"]}</div>'
+                    f'<div style="flex:1;text-align:center;font-weight:700;">{row["total"]}</div>'
+                    '</div>'
+                )
+            html += '</div>'
+            st.markdown(html, unsafe_allow_html=True)
 
 
 def leaderboard_page():

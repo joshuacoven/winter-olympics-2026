@@ -17,19 +17,29 @@ IOC_TO_COUNTRY = {
     "AUT": "Austria",
     "CAN": "Canada",
     "CHN": "China",
+    "CRO": "Croatia",
     "CZE": "Czech Republic",
+    "EST": "Estonia",
     "FIN": "Finland",
     "FRA": "France",
     "GER": "Germany",
+    "HUN": "Hungary",
+    "ISR": "Israel",
     "ITA": "Italy",
+    "JAM": "Jamaica",
     "JPN": "Japan",
+    "LAT": "Latvia",
+    "LIE": "Liechtenstein",
     "NED": "Netherlands",
     "NOR": "Norway",
+    "NZL": "New Zealand",
     "ROC": "ROC/Russia",
     "RUS": "ROC/Russia",
+    "AIN": "Individual Neutral Athletes",
     "KOR": "South Korea",
     "SWE": "Sweden",
     "SUI": "Switzerland",
+    "TPE": "Chinese Taipei",
     "USA": "United States",
     "AUS": "Australia",
     "BLR": "Belarus",
@@ -40,6 +50,22 @@ IOC_TO_COUNTRY = {
     "SLO": "Slovenia",
     "ESP": "Spain",
     "UKR": "Ukraine",
+}
+
+# Flag emoji for common IOC codes
+IOC_TO_FLAG = {
+    "AUS": "\U0001f1e6\U0001f1fa", "AUT": "\U0001f1e6\U0001f1f9", "BEL": "\U0001f1e7\U0001f1ea",
+    "BLR": "\U0001f1e7\U0001f1fe", "CAN": "\U0001f1e8\U0001f1e6", "CHN": "\U0001f1e8\U0001f1f3",
+    "CRO": "\U0001f1ed\U0001f1f7", "CZE": "\U0001f1e8\U0001f1ff", "ESP": "\U0001f1ea\U0001f1f8",
+    "EST": "\U0001f1ea\U0001f1ea", "FIN": "\U0001f1eb\U0001f1ee", "FRA": "\U0001f1eb\U0001f1f7",
+    "GBR": "\U0001f1ec\U0001f1e7", "GER": "\U0001f1e9\U0001f1ea", "HUN": "\U0001f1ed\U0001f1fa",
+    "ISR": "\U0001f1ee\U0001f1f1", "ITA": "\U0001f1ee\U0001f1f9", "JAM": "\U0001f1ef\U0001f1f2",
+    "JPN": "\U0001f1ef\U0001f1f5", "KOR": "\U0001f1f0\U0001f1f7", "LAT": "\U0001f1f1\U0001f1fb",
+    "LIE": "\U0001f1f1\U0001f1ee", "NED": "\U0001f1f3\U0001f1f1", "NOR": "\U0001f1f3\U0001f1f4",
+    "NZL": "\U0001f1f3\U0001f1ff", "POL": "\U0001f1f5\U0001f1f1", "SLO": "\U0001f1f8\U0001f1ee",
+    "SVK": "\U0001f1f8\U0001f1f0", "SUI": "\U0001f1e8\U0001f1ed", "SWE": "\U0001f1f8\U0001f1ea",
+    "TPE": "\U0001f1f9\U0001f1fc", "UKR": "\U0001f1fa\U0001f1e6", "USA": "\U0001f1fa\U0001f1f8",
+    "AIN": "\U0001f3f3\ufe0f",
 }
 
 # Map our sport category IDs to Wikipedia page names
@@ -74,7 +100,7 @@ def fetch_wiki_page(page_name: str) -> str | None:
             "page": page_name,
             "prop": "wikitext",
             "format": "json",
-        }, timeout=10)
+        }, headers={"User-Agent": "OlympicsPredictionGame/1.0"}, timeout=10)
         resp.raise_for_status()
         data = resp.json()
         if "parse" in data and "wikitext" in data["parse"]:
@@ -188,6 +214,289 @@ def get_event_gold_winner(sport_id: str, event_keyword: str) -> str | None:
         return None
 
     return parse_event_winner(wikitext, event_keyword)
+
+
+# ── New results-page scraper functions ──────────────────────────────────────
+
+# Map Wikipedia sport section headers → our sport category IDs
+_WIKI_SPORT_TO_ID = {
+    "Alpine skiing": "alpine_skiing",
+    "Biathlon": "biathlon",
+    "Bobsleigh": "bobsled",
+    "Cross-country skiing": "cross_country_skiing",
+    "Curling": "curling",
+    "Figure skating": "figure_skating",
+    "Freestyle skiing": "freestyle_skiing",
+    "Ice hockey": "ice_hockey",
+    "Luge": "luge",
+    "Nordic combined": "nordic_combined",
+    "Short track speed skating": "short_track_speed_skating",
+    "Skeleton": "skeleton",
+    "Ski jumping": "ski_jumping",
+    "Ski mountaineering": "ski_mountaineering",
+    "Snowboarding": "snowboard",
+    "Speed skating": "speed_skating",
+}
+
+
+@st.cache_data(ttl=1800)
+def fetch_medal_table() -> list[dict]:
+    """Fetch the overall medal table from Wikipedia (G/S/B/Total per country)."""
+    wikitext = fetch_wiki_page("2026_Winter_Olympics_medal_table")
+    if not wikitext:
+        return []
+
+    # Strip HTML comments to exclude commented-out entries (e.g. AIN)
+    clean = re.sub(r'<!--.*?-->', '', wikitext, flags=re.DOTALL)
+
+    countries: dict[str, dict] = {}
+    for medal_type in ("gold", "silver", "bronze"):
+        for match in re.finditer(rf'{medal_type}_([A-Z]{{3}})\s*=\s*(\d+)', clean):
+            ioc = match.group(1)
+            count = int(match.group(2))
+            if ioc not in countries:
+                countries[ioc] = {"ioc": ioc, "gold": 0, "silver": 0, "bronze": 0}
+            countries[ioc][medal_type] = count
+
+    result = []
+    for ioc, data in countries.items():
+        data["country"] = IOC_TO_COUNTRY.get(ioc, ioc)
+        data["total"] = data["gold"] + data["silver"] + data["bronze"]
+        if data["total"] > 0:
+            result.append(data)
+
+    # Sort: gold desc → silver desc → bronze desc
+    result.sort(key=lambda r: (-r["gold"], -r["silver"], -r["bronze"]))
+    return result
+
+
+@st.cache_data(ttl=1800)
+def fetch_all_medalists() -> list[dict]:
+    """
+    Fetch individual event medalists from Wikipedia.
+
+    Returns list of dicts with keys:
+      event, sport, gold_athlete, gold_country, silver_athlete, silver_country,
+      bronze_athlete, bronze_country
+    Only includes events where at least the gold medalist cell is populated.
+    """
+    wikitext = fetch_wiki_page("List_of_2026_Winter_Olympics_medal_winners")
+    if not wikitext:
+        return []
+
+    results = []
+    current_sport = None
+    current_gender = None
+
+    # Split into sections by == headers
+    lines = wikitext.split('\n')
+
+    for i, line in enumerate(lines):
+        # Track sport sections (==Sport==)
+        sport_match = re.match(r'^==([^=]+)==\s*$', line)
+        if sport_match:
+            current_sport = sport_match.group(1).strip()
+            current_gender = None
+            continue
+
+        # Track gender sub-sections (===Men's events===)
+        gender_match = re.match(r'^===([^=]+)===\s*$', line)
+        if gender_match:
+            gender_text = gender_match.group(1).strip()
+            if "Men" in gender_text:
+                current_gender = "Men"
+            elif "Women" in gender_text:
+                current_gender = "Women"
+            elif "Mixed" in gender_text:
+                current_gender = "Mixed"
+            else:
+                current_gender = None
+            continue
+
+    # Now parse event rows using the |-valign pattern
+    # Split on event rows
+    row_pattern = re.compile(r'\|-\s*valign\s*=\s*"top"')
+    rows = row_pattern.split(wikitext)
+
+    # Track current sport/gender as we go through the text
+    current_sport = None
+    current_gender = None
+
+    for row in rows[1:]:  # Skip the first split (before any row)
+        # Find where this row sits by checking preceding text for section headers
+        # We need to find the position in the original text
+        pass
+
+    # Better approach: iterate through text sequentially
+    current_sport = None
+    current_gender = None
+    # Split on lines that start event rows
+    segments = re.split(r'\n\|-\s*valign\s*=\s*"top"\s*\n', wikitext)
+    preamble = segments[0]  # Text before first event row
+
+    # Extract sport/gender from preamble
+    for m in re.finditer(r'^==([^=]+)==\s*$', preamble, re.MULTILINE):
+        current_sport = m.group(1).strip()
+    for m in re.finditer(r'^===([^=]+)===\s*$', preamble, re.MULTILINE):
+        g = m.group(1).strip()
+        if "Men" in g:
+            current_gender = "Men"
+        elif "Women" in g:
+            current_gender = "Women"
+        elif "Mixed" in g:
+            current_gender = "Mixed"
+
+    for segment in segments[1:]:
+        # Check if this segment contains new section headers before the event data
+        # Headers that appear before the next event pipe cell
+        first_pipe = segment.find('|')
+        header_region = segment[:first_pipe] if first_pipe > 0 else ""
+
+        for m in re.finditer(r'^==([^=]+)==\s*$', header_region, re.MULTILINE):
+            current_sport = m.group(1).strip()
+        for m in re.finditer(r'^===([^=]+)===\s*$', header_region, re.MULTILINE):
+            g = m.group(1).strip()
+            if "Men" in g:
+                current_gender = "Men"
+            elif "Women" in g:
+                current_gender = "Women"
+            elif "Mixed" in g:
+                current_gender = "Mixed"
+
+        # Also check for headers that appear after a table end |}
+        # and before the next event data in this segment
+        for m in re.finditer(r'^==([^=]+)==\s*$', segment, re.MULTILINE):
+            current_sport = m.group(1).strip()
+        for m in re.finditer(r'^===([^=]+)===\s*$', segment, re.MULTILINE):
+            g = m.group(1).strip()
+            if "Men" in g:
+                current_gender = "Men"
+            elif "Women" in g:
+                current_gender = "Women"
+            elif "Mixed" in g:
+                current_gender = "Mixed"
+
+        # Extract event name from first cell: | EventName<br />...
+        event_match = re.match(r'\s*\|\s*(.+?)(?:<br\s*/?>|\n)', segment)
+        if not event_match:
+            continue
+        event_name = event_match.group(1).strip()
+        # Clean up Nowrap templates: {{Nowrap|actual name}}
+        event_name = re.sub(r'\{\{Nowrap\|([^}]+)\}\}', r'\1', event_name)
+        # Remove any remaining wiki markup
+        event_name = re.sub(r'\{\{[^}]*\}\}', '', event_name).strip()
+        event_name = re.sub(r'\[\[([^|\]]*\|)?([^\]]+)\]\]', r'\2', event_name).strip()
+
+        if not event_name or not current_sport:
+            continue
+
+        # Extract medal cells - look for flagIOCmedalist patterns
+        medalist_matches = list(re.finditer(
+            r'flagIOCmedalist\|\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\|([A-Z]{3})',
+            segment
+        ))
+
+        # Skip if no medalists at all (event not held yet)
+        if not medalist_matches:
+            continue
+
+        # Build gender-qualified event name
+        gender_prefix = f"{current_gender}'s " if current_gender else ""
+        full_event = f"{gender_prefix}{event_name}"
+
+        # Parse each medal position (gold=0, silver=1, bronze=2)
+        # Split segment into pipe-delimited cells after the event name cell
+        gold_athlete = gold_country = None
+        silver_athlete = silver_country = None
+        bronze_athlete = bronze_country = None
+
+        # Find medal cells by splitting on top-level pipe delimiters
+        # After the event name cell, there are 3 cells: gold | silver | bronze
+        cells = re.split(r'\n\|', segment)
+        # cells[0] is the event name cell, cells[1..3] are G/S/B
+        for ci, cell in enumerate(cells[1:4], 1):
+            m = re.search(
+                r'flagIOCmedalist\|\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\|([A-Z]{3})',
+                cell
+            )
+            if m:
+                raw_name = m.group(2) or m.group(1)  # display name or link target
+                ioc = m.group(3)
+                if ci == 1:
+                    gold_athlete, gold_country = raw_name, ioc
+                elif ci == 2:
+                    silver_athlete, silver_country = raw_name, ioc
+                elif ci == 3:
+                    bronze_athlete, bronze_country = raw_name, ioc
+
+        # Only include if at least gold is populated
+        if gold_athlete:
+            results.append({
+                "event": full_event,
+                "sport": current_sport,
+                "gold_athlete": gold_athlete,
+                "gold_country": gold_country,
+                "silver_athlete": silver_athlete,
+                "silver_country": silver_country or "",
+                "bronze_athlete": bronze_athlete,
+                "bronze_country": bronze_country or "",
+            })
+
+    return results
+
+
+def get_medalist_summary() -> list[dict]:
+    """
+    Aggregate medalists by athlete: count G/S/B/Total across events.
+
+    Returns sorted list of {"athlete", "country", "ioc", "gold", "silver", "bronze", "total"}.
+    """
+    all_medalists = fetch_all_medalists()
+    athlete_map: dict[str, dict] = {}
+
+    for row in all_medalists:
+        for medal_type in ("gold", "silver", "bronze"):
+            name = row.get(f"{medal_type}_athlete")
+            ioc = row.get(f"{medal_type}_country")
+            if name and ioc:
+                key = f"{name}|{ioc}"
+                if key not in athlete_map:
+                    athlete_map[key] = {
+                        "athlete": name,
+                        "ioc": ioc,
+                        "country": IOC_TO_COUNTRY.get(ioc, ioc),
+                        "gold": 0, "silver": 0, "bronze": 0,
+                    }
+                athlete_map[key][medal_type] += 1
+
+    result = list(athlete_map.values())
+    for r in result:
+        r["total"] = r["gold"] + r["silver"] + r["bronze"]
+
+    result.sort(key=lambda r: (-r["total"], -r["gold"], r["athlete"]))
+    return result
+
+
+def fetch_sport_event_results(sport_name: str) -> dict[str, dict]:
+    """
+    Get individual event results for a sport.
+
+    Args:
+        sport_name: Wikipedia sport name (e.g. "Alpine skiing")
+
+    Returns:
+        Dict mapping event name → {"gold": "Country", "silver": "Country", "bronze": "Country"}
+    """
+    all_medalists = fetch_all_medalists()
+    results = {}
+    for row in all_medalists:
+        if row["sport"] == sport_name:
+            results[row["event"]] = {
+                "gold": IOC_TO_COUNTRY.get(row["gold_country"], row["gold_country"]),
+                "silver": IOC_TO_COUNTRY.get(row.get("silver_country", ""), row.get("silver_country", "")),
+                "bronze": IOC_TO_COUNTRY.get(row.get("bronze_country", ""), row.get("bronze_country", "")),
+            }
+    return results
 
 
 # Categories that need admin entry (scraper can't resolve these)
