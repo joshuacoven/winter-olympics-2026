@@ -24,6 +24,7 @@ from database import (
     get_all_pools, get_all_users_with_prediction_sets, get_users_not_in_pool,
     admin_add_user_to_pool, get_pool_members_with_assignments
 )
+from events import get_all_events
 from scraper import (
     update_results_from_scraper, ADMIN_ONLY_CATEGORIES,
     fetch_medal_table, fetch_all_medalists, get_medalist_summary,
@@ -1081,25 +1082,46 @@ def results_page():
 
                 label = f"{cat.display_name} — {status}  ({events_completed}/{cat.event_count} events)"
                 with st.expander(label, expanded=False):
-                    if sport_events:
-                        # Build HTML table of individual event results
-                        evt_html = '<div style="width:100%;">'
-                        for evt_name, evt_res in sorted(sport_events.items()):
-                            gold_c = evt_res["gold"]
-                            silver_c = evt_res["silver"]
-                            bronze_c = evt_res["bronze"]
+                    # Get all events for this sport from EVENTS_DATA
+                    all_sport_events = [e for e in get_all_events() if e.sport == cat.sport]
+                    all_sport_events.sort(key=lambda e: e.gold_medal_date)
+
+                    user_tz = st.session_state.get("timezone", "US/Eastern")
+                    evt_html = '<div style="width:100%;">'
+                    for evt in all_sport_events:
+                        evt_display = evt.display_name
+                        # Check if this event has a result from Wikipedia
+                        # Match by checking if event name appears in completed results
+                        matched_result = None
+                        for completed_name, res in sport_events.items():
+                            if completed_name.lower() in evt_display.lower() or evt_display.lower() in completed_name.lower():
+                                matched_result = res
+                                break
+
+                        if matched_result:
                             evt_html += (
-                                f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;">'
-                                f'<div style="flex:3;">{evt_name}</div>'
-                                f'<div style="flex:2;">🥇 {gold_c}</div>'
-                                f'<div style="flex:2;">🥈 {silver_c}</div>'
-                                f'<div style="flex:2;">🥉 {bronze_c}</div>'
+                                f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:center;">'
+                                f'<div style="flex:3;">✅ {evt_display}</div>'
+                                f'<div style="flex:2;">🥇 {matched_result["gold"]}</div>'
+                                f'<div style="flex:2;">🥈 {matched_result["silver"]}</div>'
+                                f'<div style="flex:2;">🥉 {matched_result["bronze"]}</div>'
                                 '</div>'
                             )
-                        evt_html += '</div>'
-                        st.markdown(evt_html, unsafe_allow_html=True)
-                    else:
-                        st.caption("No event results available yet.")
+                        else:
+                            start_str = format_datetime(evt.first_round_date, user_tz)
+                            medal_str = format_datetime(evt.gold_medal_date, user_tz)
+                            if start_str == medal_str:
+                                date_display = medal_str
+                            else:
+                                date_display = f"{start_str} — {medal_str}"
+                            evt_html += (
+                                f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:center;color:#999;">'
+                                f'<div style="flex:3;">⏳ {evt_display}</div>'
+                                f'<div style="flex:6;font-size:12px;">{date_display}</div>'
+                                '</div>'
+                            )
+                    evt_html += '</div>'
+                    st.markdown(evt_html, unsafe_allow_html=True)
 
             # Featured / prop / overall categories
             if other_cats:

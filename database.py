@@ -787,6 +787,18 @@ def save_category_result(category_id: str, winning_country: str):
         pass
 
 
+def delete_category_result(category_id: str):
+    """Delete a category result (e.g. to clear a premature result)."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM category_results WHERE category_id = ?", (category_id,))
+        conn.commit()
+        _sync_if_turso(conn)
+    finally:
+        pass
+
+
 # ============== ADMIN POOL MANAGEMENT FUNCTIONS ==============
 
 def get_all_pools() -> list[dict]:

@@ -8,7 +8,9 @@ import logging
 import re
 import requests
 import streamlit as st
-from database import save_category_result, get_category_results
+from datetime import datetime
+from database import save_category_result, get_category_results, delete_category_result
+from categories import get_all_categories
 
 logger = logging.getLogger(__name__)
 
@@ -507,15 +509,34 @@ ADMIN_ONLY_CATEGORIES = {
 }
 
 
+def _category_is_complete(category_id: str) -> bool:
+    """Check if all events for a category have finished (last_event_date has passed)."""
+    now = datetime.now()
+    for cat in get_all_categories():
+        if cat.id == category_id:
+            if cat.last_event_date and cat.last_event_date < now:
+                return True
+            return False
+    return False
+
+
 def update_results_from_scraper():
     """
     Fetch Wikipedia data and update category results in the DB.
-    Skips categories that already have results or need admin entry.
+    Only saves results for categories whose last_event_date has passed,
+    preventing premature results from partial data.
+    Cleans up any previously saved premature results.
+    Skips categories that need admin entry.
     """
     existing_results = get_category_results()
 
     # Sport-level categories: country with most golds
     for sport_id in SPORT_TO_WIKI_PAGE:
+        if not _category_is_complete(sport_id):
+            # Remove premature result if one was saved earlier
+            if sport_id in existing_results:
+                delete_category_result(sport_id)
+            continue
         if sport_id in existing_results:
             continue
         leader = get_sport_gold_leader(sport_id)
@@ -523,21 +544,30 @@ def update_results_from_scraper():
             save_category_result(sport_id, leader)
 
     # Overall: country with most golds across all sports
-    if "overall" not in existing_results:
+    if not _category_is_complete("overall"):
+        if "overall" in existing_results:
+            delete_category_result("overall")
+    elif "overall" not in existing_results:
         overall_leader = get_overall_gold_leader()
         if overall_leader:
             save_category_result("overall", overall_leader)
 
     # Featured: Men's Ice Hockey Gold
     hockey_cat_id = "featured_mens_ice_hockey_gold"
-    if hockey_cat_id not in existing_results:
+    if not _category_is_complete(hockey_cat_id):
+        if hockey_cat_id in existing_results:
+            delete_category_result(hockey_cat_id)
+    elif hockey_cat_id not in existing_results:
         winner = get_event_gold_winner("ice_hockey", "Men")
         if winner:
             save_category_result(hockey_cat_id, winner)
 
     # Featured: Women's Figure Skating Singles country
     fs_cat_id = "prop_womens_figure_skating_country"
-    if fs_cat_id not in existing_results:
+    if not _category_is_complete(fs_cat_id):
+        if fs_cat_id in existing_results:
+            delete_category_result(fs_cat_id)
+    elif fs_cat_id not in existing_results:
         winner = get_event_gold_winner("figure_skating", "Women's Singles")
         if winner:
             save_category_result(fs_cat_id, winner)
