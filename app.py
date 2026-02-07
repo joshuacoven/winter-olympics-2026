@@ -5,6 +5,7 @@ A Streamlit app for friends to predict gold medal winners and compete.
 """
 
 import os
+import re
 import time
 import logging
 import streamlit as st
@@ -974,6 +975,73 @@ def _flag_for_ioc(ioc: str) -> str:
     return IOC_TO_FLAG.get(ioc, "")
 
 
+def _normalize_event_name(name: str) -> str:
+    """Normalize an event name for matching.
+
+    Strips gender prefix, expands abbreviations, lowercases,
+    removes spaces/punctuation.
+    """
+    n = name.lower().strip()
+    # Strip gender prefix
+    for prefix in ("men's ", "women's ", "mixed "):
+        if n.startswith(prefix):
+            n = n[len(prefix):]
+            break
+    # Normalize common abbreviations
+    n = n.replace("kilometres", "km").replace("kilometre", "km").replace("metres", "m").replace("metre", "m")
+    # Remove spaces, punctuation for comparison
+    n = re.sub(r'[^a-z0-9]', '', n)
+    return n
+
+
+def _event_type_keyword(name: str) -> str:
+    """Extract the event type keyword (letters only, no digits) for fuzzy fallback.
+
+    E.g. "20kmskiathlon" → "kmskiathlon", "3000m" → "m"
+    Only useful when result is >= 4 chars (avoids false matches on "m").
+    """
+    return re.sub(r'[0-9]', '', _normalize_event_name(name))
+
+
+def _extract_gender(name: str) -> str:
+    """Extract gender prefix from event name."""
+    low = name.lower()
+    if low.startswith("women"):
+        return "women"
+    if low.startswith("men"):
+        return "men"
+    if low.startswith("mixed"):
+        return "mixed"
+    return ""
+
+
+def _events_match(wiki_name: str, data_name: str) -> bool:
+    """Check if a Wikipedia event name matches an EVENTS_DATA event name.
+
+    Requires gender match, then tries strict normalized match,
+    then a fuzzy fallback using event type keywords.
+    """
+    if _extract_gender(wiki_name) != _extract_gender(data_name):
+        return False
+
+    wiki_norm = _normalize_event_name(wiki_name)
+    data_norm = _normalize_event_name(data_name)
+
+    # Strict: exact or substring match on normalized names
+    if wiki_norm == data_norm or wiki_norm in data_norm or data_norm in wiki_norm:
+        return True
+
+    # Fuzzy fallback: compare event type keywords (letters only, no digits)
+    # Only if the keyword is meaningful (>= 4 chars) to avoid "m" == "m"
+    wiki_kw = _event_type_keyword(wiki_name)
+    data_kw = _event_type_keyword(data_name)
+    if len(wiki_kw) >= 4 and len(data_kw) >= 4:
+        if wiki_kw == data_kw or wiki_kw in data_kw or data_kw in wiki_kw:
+            return True
+
+    return False
+
+
 def results_page():
     """Show actual Olympic results with medal tally in a 3-tab layout."""
     st.title("Results")
@@ -1084,20 +1152,30 @@ def results_page():
                 with st.expander(label, expanded=False):
                     # Get all events for this sport from EVENTS_DATA
                     all_sport_events = [e for e in get_all_events() if e.sport == cat.sport]
-                    all_sport_events.sort(key=lambda e: e.gold_medal_date)
+
+                    # Match each event to Wikipedia results
+                    # Use gender + normalized name to avoid false matches
+                    # (e.g. "men's downhill" inside "women's downhill")
+                    matched_events = []  # (event, result_or_None)
+                    used_wiki_keys = set()
+                    for evt in all_sport_events:
+                        matched_result = None
+                        for completed_name, res in sport_events.items():
+                            if completed_name in used_wiki_keys:
+                                continue
+                            if _events_match(completed_name, evt.display_name):
+                                matched_result = res
+                                used_wiki_keys.add(completed_name)
+                                break
+                        matched_events.append((evt, matched_result))
+
+                    # Sort: completed events first (by gold_medal_date), then pending (by gold_medal_date)
+                    matched_events.sort(key=lambda x: (0 if x[1] else 1, x[0].gold_medal_date))
 
                     user_tz = st.session_state.get("timezone", "US/Eastern")
                     evt_html = '<div style="width:100%;">'
-                    for evt in all_sport_events:
+                    for evt, matched_result in matched_events:
                         evt_display = evt.display_name
-                        # Check if this event has a result from Wikipedia
-                        # Match by checking if event name appears in completed results
-                        matched_result = None
-                        for completed_name, res in sport_events.items():
-                            if completed_name.lower() in evt_display.lower() or evt_display.lower() in completed_name.lower():
-                                matched_result = res
-                                break
-
                         if matched_result:
                             evt_html += (
                                 f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:center;">'
