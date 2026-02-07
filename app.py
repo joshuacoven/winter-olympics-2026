@@ -1156,11 +1156,12 @@ def results_page():
                         max_golds = max(gold_counts.values())
                         leaders = sorted(c for c, g in gold_counts.items() if g == max_golds)
                         leader_str = ", ".join(leaders)
-                        status = f"⏳ Leading: {leader_str}"
+                        status = f"Leading: {leader_str}"
                     else:
-                        status = "⏳ Pending"
+                        status = ""
 
-                label = f"{cat.display_name} — {status}  ({events_completed}/{cat.event_count} events)"
+                status_part = f" — {status}" if status else ""
+                label = f"{cat.display_name}{status_part}  ({events_completed}/{cat.event_count} events)"
                 with st.expander(label, expanded=False):
                     # Get all events for this sport from EVENTS_DATA
                     all_sport_events = [e for e in get_all_events() if e.sport == cat.sport]
@@ -1190,8 +1191,10 @@ def results_page():
                         evt_display = evt.display_name
                         if matched_result:
                             evt_html += (
-                                f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:center;">'
-                                f'<div style="flex:3;">✅ {evt_display}</div>'
+                                f'<div style="display:flex;padding:6px 4px;border-bottom:1px solid #f0f0f0;'
+                                f'font-size:13px;align-items:center;color:#333;'
+                                f'border-left:3px solid #28A745;background:#f8fff8;">'
+                                f'<div style="flex:3;">{evt_display}</div>'
                                 f'<div style="flex:2;">🥇 {matched_result["gold"]}</div>'
                                 f'<div style="flex:2;">🥈 {matched_result["silver"]}</div>'
                                 f'<div style="flex:2;">🥉 {matched_result["bronze"]}</div>'
@@ -1205,8 +1208,10 @@ def results_page():
                             else:
                                 date_display = f"{start_str} — {medal_str}"
                             evt_html += (
-                                f'<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;align-items:center;color:#999;">'
-                                f'<div style="flex:3;">⏳ {evt_display}</div>'
+                                f'<div style="display:flex;padding:6px 4px;border-bottom:1px solid #f0f0f0;'
+                                f'font-size:13px;align-items:center;color:#888;'
+                                f'border-left:3px solid transparent;">'
+                                f'<div style="flex:3;">{evt_display}</div>'
                                 f'<div style="flex:6;font-size:12px;">{date_display}</div>'
                                 '</div>'
                             )
