@@ -968,6 +968,8 @@ def _normalize_event_name(name: str) -> str:
             break
     # Normalize common abbreviations
     n = n.replace("kilometres", "km").replace("kilometre", "km").replace("metres", "m").replace("metre", "m")
+    # Expand Olympics.com abbreviations (must happen before stripping spaces)
+    n = re.sub(r'\bnh\b', 'normal hill', n)
     # Remove spaces, punctuation for comparison
     n = re.sub(r'[^a-z0-9]', '', n)
     return n

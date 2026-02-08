@@ -316,9 +316,9 @@ EVENTS_DATA = [
           datetime(2026, 2, 18, 13, 0), datetime(2026, 2, 19, 13, 30)),
     Event("Snowboard", "Mixed Team Snowboard Cross", "Mixed",
           datetime(2026, 2, 21, 13, 0), datetime(2026, 2, 21, 14, 30)),
-    Event("Snowboard", "Women's PGS", "Women",
+    Event("Snowboard", "Women's Parallel Giant Slalom", "Women",
           datetime(2026, 2, 20, 12, 0), datetime(2026, 2, 20, 13, 30)),
-    Event("Snowboard", "Men's PGS", "Men",
+    Event("Snowboard", "Men's Parallel Giant Slalom", "Men",
           datetime(2026, 2, 20, 13, 0), datetime(2026, 2, 20, 14, 30)),
 
     # Alpine Skiing - Men's (5 events) - Bormio (Valtellina)
