@@ -30,7 +30,6 @@ from scraper import (
     update_results_from_scraper, ADMIN_ONLY_CATEGORIES,
     fetch_medal_table, fetch_all_medalists, get_medalist_summary,
     fetch_sport_event_results, IOC_TO_FLAG, IOC_TO_COUNTRY,
-    _WIKI_SPORT_TO_ID,
 )
 
 # Page config
@@ -939,26 +938,6 @@ def pool_view_page(show_header: bool = True):
                 st.markdown(f"{icon} **{user}**{is_you} — {pick}")
 
 
-# Map our sport names (from categories.py) → Wikipedia section names (from medalists page)
-_SPORT_TO_WIKI_SECTION = {
-    "Alpine Skiing": "Alpine skiing",
-    "Biathlon": "Biathlon",
-    "Bobsled": "Bobsleigh",
-    "Cross-Country Skiing": "Cross-country skiing",
-    "Curling": "Curling",
-    "Figure Skating": "Figure skating",
-    "Freestyle Skiing": "Freestyle skiing",
-    "Ice Hockey": "Ice hockey",
-    "Luge": "Luge",
-    "Nordic Combined": "Nordic combined",
-    "Short Track Speed Skating": "Short track speed skating",
-    "Skeleton": "Skeleton",
-    "Ski Jumping": "Ski jumping",
-    "Ski Mountaineering": "Ski mountaineering",
-    "Snowboard": "Snowboarding",
-    "Speed Skating": "Speed skating",
-}
-
 
 def _medal_circle(color: str, label: str) -> str:
     """Return HTML for a small colored circle with a label."""
@@ -1138,8 +1117,7 @@ def results_page():
             st.subheader("Sport Categories")
             for cat in sport_cats:
                 result = results.get(cat.id)
-                wiki_section = _SPORT_TO_WIKI_SECTION.get(cat.sport)
-                sport_events = fetch_sport_event_results(wiki_section) if wiki_section else {}
+                sport_events = fetch_sport_event_results(cat.sport)
                 events_completed = len(sport_events)
 
                 if result:
