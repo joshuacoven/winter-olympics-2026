@@ -33,6 +33,7 @@ _BROWSER_HEADERS = {
 }
 
 OLYMPICS_MEDALS_URL = "https://www.olympics.com/en/milano-cortina-2026/medals"
+OLYMPICS_MEDALLISTS_URL = "https://www.olympics.com/en/milano-cortina-2026/medals/medallists"
 
 # IOC 3-letter codes to country names (matching events.py WINTER_OLYMPICS_COUNTRIES)
 IOC_TO_COUNTRY = {
@@ -279,6 +280,7 @@ def fetch_all_medalists() -> list[dict]:
         return []
 
     # Collect all medal winners grouped by event
+    # Each medal type stores lists to handle ties (e.g. two teams tie for silver)
     event_medals: dict[str, dict] = {}  # key = eventCode
 
     for entry in data.get("medalsTable", []):
@@ -299,32 +301,111 @@ def fetch_all_medalists() -> list[dict]:
                     event_medals[event_code] = {
                         "event": event_desc,
                         "sport": sport_display,
-                        "gold_athlete": None, "gold_country": "",
-                        "silver_athlete": None, "silver_country": "",
-                        "bronze_athlete": None, "bronze_country": "",
+                        "gold_athletes": [], "gold_countries": [],
+                        "silver_athletes": [], "silver_countries": [],
+                        "bronze_athletes": [], "bronze_countries": [],
                     }
 
                 row = event_medals[event_code]
                 if medal_type == "ME_GOLD":
-                    row["gold_athlete"] = athlete
-                    row["gold_country"] = ioc
+                    row["gold_athletes"].append(athlete)
+                    row["gold_countries"].append(ioc)
                 elif medal_type == "ME_SILVER":
-                    row["silver_athlete"] = athlete
-                    row["silver_country"] = ioc
+                    row["silver_athletes"].append(athlete)
+                    row["silver_countries"].append(ioc)
                 elif medal_type == "ME_BRONZE":
-                    row["bronze_athlete"] = athlete
-                    row["bronze_country"] = ioc
+                    row["bronze_athletes"].append(athlete)
+                    row["bronze_countries"].append(ioc)
 
-    # Only include events with at least a gold medalist
-    results = [row for row in event_medals.values() if row["gold_athlete"]]
+    # Flatten to single values for backward compatibility, joining ties with " / "
+    results = []
+    for row in event_medals.values():
+        if not row["gold_athletes"]:
+            continue
+        results.append({
+            "event": row["event"],
+            "sport": row["sport"],
+            "gold_athlete": " / ".join(row["gold_athletes"]),
+            "gold_country": row["gold_countries"][0] if row["gold_countries"] else "",
+            "silver_athlete": " / ".join(row["silver_athletes"]),
+            "silver_country": " / ".join(row["silver_countries"]),
+            "bronze_athlete": " / ".join(row["bronze_athletes"]),
+            "bronze_country": " / ".join(row["bronze_countries"]),
+        })
     return results
+
+
+@st.cache_data(ttl=600)
+def _fetch_medallists_data() -> list[dict] | None:
+    """
+    Fetch the Olympics.com medallists page and extract individual athlete data.
+    This page lists every medalist individually, including team members.
+    Cached for 10 minutes.
+    """
+    try:
+        html = _curl_fetch(OLYMPICS_MEDALLISTS_URL)
+        if not html:
+            return None
+
+        # Data is embedded in a script tag as JSON containing result_medallists_data
+        scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
+        for script in scripts:
+            script = script.strip()
+            if not script.startswith('{'):
+                continue
+            try:
+                data = json.loads(script)
+                if "result_medallists_data" in data:
+                    athletes = (
+                        data["result_medallists_data"]
+                        .get("initialMedallist", {})
+                        .get("athletes", [])
+                    )
+                    if athletes:
+                        return athletes
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+        logger.warning("Could not find medallists data in Olympics.com HTML")
+        return None
+    except Exception:
+        logger.warning("Failed to fetch Olympics.com medallists data", exc_info=True)
+        return None
 
 
 def get_medalist_summary() -> list[dict]:
     """
-    Aggregate medalists by athlete: count G/S/B/Total across events.
+    Get individual medalist summary from the Olympics.com medallists page.
+    Lists every athlete individually, including team members.
 
     Returns sorted list of {"athlete", "country", "ioc", "gold", "silver", "bronze", "total"}.
+    """
+    athletes = _fetch_medallists_data()
+    if not athletes:
+        # Fallback to aggregating from medal standings page
+        return _get_medalist_summary_fallback()
+
+    result = []
+    for a in athletes:
+        ioc = a.get("organisation", "")
+        result.append({
+            "athlete": a.get("tvName", a.get("fullName", "")),
+            "ioc": ioc,
+            "country": IOC_TO_COUNTRY.get(ioc, a.get("organisationName", ioc)),
+            "gold": a.get("medalsGold", 0),
+            "silver": a.get("medalsSilver", 0),
+            "bronze": a.get("medalsBronze", 0),
+            "total": a.get("medalsTotal", 0),
+        })
+
+    result.sort(key=lambda r: (-r["total"], -r["gold"], r["athlete"]))
+    return result
+
+
+def _get_medalist_summary_fallback() -> list[dict]:
+    """
+    Fallback: aggregate medalists from the medals standings page.
+    Does not include individual team members.
     """
     all_medalists = fetch_all_medalists()
     athlete_map: dict[str, dict] = {}
@@ -334,6 +415,9 @@ def get_medalist_summary() -> list[dict]:
             name = row.get(f"{medal_type}_athlete")
             ioc = row.get(f"{medal_type}_country")
             if name and ioc:
+                # Skip entries with " / " (tied countries) for clean athlete display
+                if " / " in ioc:
+                    continue
                 key = f"{name}|{ioc}"
                 if key not in athlete_map:
                     athlete_map[key] = {
@@ -370,10 +454,15 @@ def fetch_sport_event_results(sport_name: str) -> dict[str, dict]:
     results = {}
     for row in all_medalists:
         if row["sport"].lower().strip() == sport_lower:
+            # Handle tied medals (countries joined with " / ")
+            def _resolve_countries(raw: str) -> str:
+                parts = [p.strip() for p in raw.split("/") if p.strip()]
+                return " / ".join(IOC_TO_COUNTRY.get(p, p) for p in parts)
+
             results[row["event"]] = {
-                "gold": IOC_TO_COUNTRY.get(row["gold_country"], row["gold_country"]),
-                "silver": IOC_TO_COUNTRY.get(row.get("silver_country", ""), row.get("silver_country", "")),
-                "bronze": IOC_TO_COUNTRY.get(row.get("bronze_country", ""), row.get("bronze_country", "")),
+                "gold": _resolve_countries(row.get("gold_country", "")),
+                "silver": _resolve_countries(row.get("silver_country", "")),
+                "bronze": _resolve_countries(row.get("bronze_country", "")),
             }
     return results
 

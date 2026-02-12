@@ -446,33 +446,48 @@ def render_category_card(
             else:
                 st.markdown("*No prediction made*", help="Event has started")
         elif category.answer_type == ANSWER_YES_NO:
-            options = ["", "Yes", "No"]
-            current_idx = options.index(prediction) if prediction in options else 0
-            selected = st.selectbox(
-                "Prediction", options=options, index=current_idx,
-                key=card_key, label_visibility="collapsed"
-            )
-            if selected and selected != prediction:
-                on_change_callback(category.id, selected)
+            drop_col, pick_col = st.columns([3, 1])
+            with drop_col:
+                options = ["", "Yes", "No"]
+                current_idx = options.index(prediction) if prediction in options else 0
+                selected = st.selectbox(
+                    "Prediction", options=options, index=current_idx,
+                    key=card_key, label_visibility="collapsed"
+                )
+                if selected and selected != prediction:
+                    on_change_callback(category.id, selected)
+            with pick_col:
+                if prediction:
+                    st.markdown(f'<div style="padding-top:8px;font-size:0.85em;color:#333;font-weight:500;">Pick: {prediction}</div>', unsafe_allow_html=True)
         elif category.answer_type == ANSWER_NUMBER:
-            current_val = prediction or ""
-            selected = st.text_input(
-                "Prediction", value=current_val,
-                placeholder="Enter a number",
-                key=card_key, label_visibility="collapsed"
-            )
-            if selected and selected != prediction and selected.isdigit():
-                on_change_callback(category.id, selected)
+            drop_col, pick_col = st.columns([3, 1])
+            with drop_col:
+                current_val = prediction or ""
+                selected = st.text_input(
+                    "Prediction", value=current_val,
+                    placeholder="Enter a number",
+                    key=card_key, label_visibility="collapsed"
+                )
+                if selected and selected != prediction and selected.isdigit():
+                    on_change_callback(category.id, selected)
+            with pick_col:
+                if prediction:
+                    st.markdown(f'<div style="padding-top:8px;font-size:0.85em;color:#333;font-weight:500;">Pick: {prediction}</div>', unsafe_allow_html=True)
         else:
             # Country dropdown (default)
-            countries_with_empty = [""] + countries
-            current_idx = countries_with_empty.index(prediction) if prediction in countries_with_empty else 0
-            selected = st.selectbox(
-                "Prediction", options=countries_with_empty, index=current_idx,
-                key=card_key, label_visibility="collapsed"
-            )
-            if selected and selected != prediction:
-                on_change_callback(category.id, selected)
+            drop_col, pick_col = st.columns([3, 1])
+            with drop_col:
+                countries_with_empty = [""] + countries
+                current_idx = countries_with_empty.index(prediction) if prediction in countries_with_empty else 0
+                selected = st.selectbox(
+                    "Prediction", options=countries_with_empty, index=current_idx,
+                    key=card_key, label_visibility="collapsed"
+                )
+                if selected and selected != prediction:
+                    on_change_callback(category.id, selected)
+            with pick_col:
+                if prediction:
+                    st.markdown(f'<div style="padding-top:8px;font-size:0.85em;color:#333;font-weight:500;">Pick: {prediction}</div>', unsafe_allow_html=True)
 
         # Show result if available
         if result and status_color:
@@ -1170,14 +1185,32 @@ def results_page():
                     for evt, matched_result in matched_events:
                         evt_display = evt.display_name
                         if matched_result:
+                            # Build medal columns, handling ties (e.g. "Switzerland / Austria")
+                            gold = matched_result["gold"]
+                            silver = matched_result["silver"]
+                            bronze = matched_result["bronze"]
+                            medal_parts = ""
+                            if " / " in gold:
+                                for g in gold.split(" / "):
+                                    medal_parts += f'<div style="flex:2;">🥇 {g.strip()}</div>'
+                            else:
+                                medal_parts += f'<div style="flex:2;">🥇 {gold}</div>' if gold else '<div style="flex:2;"></div>'
+                            if " / " in silver:
+                                for s in silver.split(" / "):
+                                    medal_parts += f'<div style="flex:2;">🥈 {s.strip()}</div>'
+                            else:
+                                medal_parts += f'<div style="flex:2;">🥈 {silver}</div>' if silver else '<div style="flex:2;"></div>'
+                            if " / " in bronze:
+                                for b in bronze.split(" / "):
+                                    medal_parts += f'<div style="flex:2;">🥉 {b.strip()}</div>'
+                            else:
+                                medal_parts += f'<div style="flex:2;">🥉 {bronze}</div>' if bronze else '<div style="flex:2;"></div>'
                             evt_html += (
                                 f'<div style="display:flex;padding:6px 4px;border-bottom:1px solid #f0f0f0;'
                                 f'font-size:13px;align-items:center;color:#333;'
                                 f'border-left:3px solid #28A745;background:#f8fff8;">'
                                 f'<div style="flex:3;">{evt_display}</div>'
-                                f'<div style="flex:2;">🥇 {matched_result["gold"]}</div>'
-                                f'<div style="flex:2;">🥈 {matched_result["silver"]}</div>'
-                                f'<div style="flex:2;">🥉 {matched_result["bronze"]}</div>'
+                                f'{medal_parts}'
                                 '</div>'
                             )
                         else:
