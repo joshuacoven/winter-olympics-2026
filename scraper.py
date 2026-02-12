@@ -479,12 +479,23 @@ ADMIN_ONLY_CATEGORIES = {
 
 
 def _category_is_complete(category_id: str) -> bool:
-    """Check if all events for a category have finished (last_event_date has passed)."""
+    """Check if all events for a category have finished.
+
+    Uses last_event_date as primary check, but also considers a sport
+    complete if the scraper already has results for all its events
+    (handles schedule changes where events finish earlier than expected).
+    """
     now = datetime.now()
     for cat in get_all_categories():
         if cat.id == category_id:
             if cat.last_event_date and cat.last_event_date < now:
                 return True
+            # Fallback: check if scraper has all event results for this sport
+            sport_display = _SPORT_ID_TO_NAME.get(category_id)
+            if sport_display and cat.event_count > 0:
+                sport_results = fetch_sport_event_results(sport_display)
+                if len(sport_results) >= cat.event_count:
+                    return True
             return False
     return False
 

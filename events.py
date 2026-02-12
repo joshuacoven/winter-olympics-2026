@@ -109,9 +109,9 @@ EVENTS_DATA = [
     Event("Luge", "Women's Doubles", "Women",
           datetime(2026, 2, 11, 18, 30), datetime(2026, 2, 11, 20, 30)),
     Event("Luge", "Men's Doubles", "Men",
-          datetime(2026, 2, 12, 18, 30), datetime(2026, 2, 12, 20, 30)),
+          datetime(2026, 2, 11, 18, 30), datetime(2026, 2, 11, 20, 30)),
     Event("Luge", "Team Relay", "Mixed",
-          datetime(2026, 2, 13, 18, 30), datetime(2026, 2, 13, 20, 0)),
+          datetime(2026, 2, 12, 18, 30), datetime(2026, 2, 12, 20, 0)),
 
     # Biathlon (11 events) - Anterselva (Cortina zone)
     Event("Biathlon", "Mixed Relay", "Mixed",
