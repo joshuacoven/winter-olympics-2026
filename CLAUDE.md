@@ -1,5 +1,10 @@
 # Winter Olympics 2026 Prediction Game
 
+## Environment
+- Conda env: `olympics-game` (`~/miniforge3/envs/olympics-game/`)
+- Python: `/Users/joshuacoven/miniforge3/envs/olympics-game/bin/python`
+- Streamlit: `/Users/joshuacoven/miniforge3/envs/olympics-game/bin/streamlit`
+
 ## Project Overview
 A Streamlit-based prediction game where users predict which countries will win the most gold medals in various Winter Olympics categories. Users can create prediction sets, join pools with friends, and compete on leaderboards.
 

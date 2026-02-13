@@ -995,6 +995,7 @@ def _normalize_event_name(name: str) -> str:
     n = n.replace("kilometres", "km").replace("kilometre", "km").replace("metres", "m").replace("metre", "m")
     # Expand Olympics.com abbreviations (must happen before stripping spaces)
     n = re.sub(r'\bnh\b', 'normal hill', n)
+    n = re.sub(r'\blh\b', 'large hill', n)
     # Remove spaces, punctuation for comparison
     n = re.sub(r'[^a-z0-9]', '', n)
     return n
@@ -1113,7 +1114,7 @@ def results_page():
             html += '</div>'
             st.markdown(html, unsafe_allow_html=True)
 
-            st.caption(f"Completed events: {completed_count} of 116")
+            st.caption(f"Completed events: {completed_count} of {len(get_all_events())}")
 
     # ── Tab 2: Prediction Results ───────────────────────────────────────
     with tab_predictions:
