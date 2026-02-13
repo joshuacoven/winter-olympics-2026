@@ -1331,11 +1331,22 @@ def leaderboard_page():
         return
 
     current_user = st.session_state.user_name
-    sorted_users = data["sorted_users"]
     scores = data["scores"]
 
-    # Spacing between dropdown and table
-    st.markdown("")
+    # Sort toggle
+    sort_col, _ = st.columns([1, 3])
+    with sort_col:
+        sort_by = st.selectbox(
+            "Sort by",
+            ["Correct Picks", "Projected Picks"],
+            key="leaderboard_sort",
+            label_visibility="collapsed",
+        )
+
+    if sort_by == "Projected Picks":
+        sorted_users = sorted(data["users"], key=lambda u: (scores[u]["projected"], scores[u]["correct"]), reverse=True)
+    else:
+        sorted_users = sorted(data["users"], key=lambda u: (scores[u]["correct"], scores[u]["projected"]), reverse=True)
 
     # Full leaderboard - column headers + rows rendered as single HTML block
     leaderboard_html = '<div style="width: 100%;">'
