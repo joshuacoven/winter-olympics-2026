@@ -292,6 +292,37 @@ class PredictionCategory:
 
 ---
 
+## Scraping Olympics.com
+
+**Olympics.com uses Akamai CDN with aggressive bot protection.** Standard HTTP tools (Python `requests`, `WebFetch`) will get 403 errors due to TLS fingerprinting.
+
+**Always use curl** (via subprocess or Bash) with full browser headers to fetch Olympics.com pages:
+
+```bash
+curl -sL \
+  -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" \
+  -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+  -H "Accept-Language: en-US,en;q=0.9" \
+  -H "Accept-Encoding: identity" \
+  -H "Sec-Fetch-Dest: document" \
+  -H "Sec-Fetch-Mode: navigate" \
+  -H "Sec-Fetch-Site: none" \
+  "https://www.olympics.com/en/milano-cortina-2026/..."
+```
+
+Or use the `_curl_fetch()` helper in `scraper.py` from Python:
+```python
+from scraper import _curl_fetch
+html = _curl_fetch("https://www.olympics.com/en/milano-cortina-2026/schedule/short-track-speed-skating")
+```
+
+**Key data pages:**
+- Medal standings: `/en/milano-cortina-2026/medals` — JSON in `"medalStandings"` key
+- Individual medalists: `/en/milano-cortina-2026/medals/medallists` — JSON in `result_medallists_data` inside a `<script>` tag
+- Sport schedules: `/en/milano-cortina-2026/schedule/{sport-slug}` — embedded JSON schedule data
+
+---
+
 ## Resources
 
 ### Design Inspiration

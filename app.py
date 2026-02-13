@@ -30,6 +30,7 @@ from scraper import (
     update_results_from_scraper, ADMIN_ONLY_CATEGORIES,
     fetch_medal_table, fetch_all_medalists, get_medalist_summary,
     fetch_sport_event_results, IOC_TO_FLAG, IOC_TO_COUNTRY,
+    get_projected_leaders,
 )
 
 # Page config
@@ -802,14 +803,19 @@ def get_pool_data(pool_code: str):
     user_predictions = {user: get_predictions_for_set(set_id) for user, set_id in assignments.items()}
 
     # Calculate scores
+    projected = get_projected_leaders()
     scores = {}
     for user in users:
         correct = sum(
             1 for cat in categories
             if cat.id in results and user_predictions[user].get(cat.id) in results[cat.id]
         )
+        projected_correct = sum(
+            1 for cat in categories
+            if cat.id in projected and user_predictions[user].get(cat.id) in projected[cat.id]
+        )
         total = len(user_predictions[user])
-        scores[user] = {"correct": correct, "total": total}
+        scores[user] = {"correct": correct, "total": total, "projected": projected_correct}
 
     sorted_users = sorted(users, key=lambda u: scores[u]["correct"], reverse=True)
 
@@ -862,6 +868,7 @@ def pool_view_page(show_header: bool = True):
     top3_html += '<div style="flex: 1; font-weight: 600; color: #666;">Placement</div>'
     top3_html += '<div style="flex: 3; font-weight: 600; color: #666;">User</div>'
     top3_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Correct Picks</div>'
+    top3_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Projected Picks</div>'
     top3_html += '</div>'
 
     for i, user in enumerate(sorted_users[:3]):
@@ -869,12 +876,15 @@ def pool_view_page(show_header: bool = True):
         is_current = user == current_user
         name_display = f"<strong>{user}</strong> (you)" if is_current else user
         score_display = f"<strong>{scores[user]['correct']}</strong> / {scores[user]['total']}"
+        projected = scores[user].get("projected", scores[user]["correct"])
+        proj_display = f"<strong>{projected}</strong> / {scores[user]['total']}"
         border = 'border-bottom: 1px solid #f0f0f0;' if i < 2 else ''
 
         top3_html += f'<div style="display: flex; padding: 12px 0; {border} align-items: center;">'
         top3_html += f'<div style="flex: 1; font-weight: 700;">#{rank}</div>'
         top3_html += f'<div style="flex: 3;">{name_display}</div>'
         top3_html += f'<div style="flex: 2; text-align: right;">{score_display}</div>'
+        top3_html += f'<div style="flex: 2; text-align: right; color: #666;">{proj_display}</div>'
         top3_html += '</div>'
 
     top3_html += '</div>'
@@ -1185,32 +1195,23 @@ def results_page():
                     for evt, matched_result in matched_events:
                         evt_display = evt.display_name
                         if matched_result:
-                            # Build medal columns, handling ties (e.g. "Switzerland / Austria")
-                            gold = matched_result["gold"]
-                            silver = matched_result["silver"]
-                            bronze = matched_result["bronze"]
-                            medal_parts = ""
-                            if " / " in gold:
-                                for g in gold.split(" / "):
-                                    medal_parts += f'<div style="flex:2;">🥇 {g.strip()}</div>'
-                            else:
-                                medal_parts += f'<div style="flex:2;">🥇 {gold}</div>' if gold else '<div style="flex:2;"></div>'
-                            if " / " in silver:
-                                for s in silver.split(" / "):
-                                    medal_parts += f'<div style="flex:2;">🥈 {s.strip()}</div>'
-                            else:
-                                medal_parts += f'<div style="flex:2;">🥈 {silver}</div>' if silver else '<div style="flex:2;"></div>'
-                            if " / " in bronze:
-                                for b in bronze.split(" / "):
-                                    medal_parts += f'<div style="flex:2;">🥉 {b.strip()}</div>'
-                            else:
-                                medal_parts += f'<div style="flex:2;">🥉 {bronze}</div>' if bronze else '<div style="flex:2;"></div>'
+                            # Build medal columns, handling ties within the same column
+                            def _medal_cell(emoji, raw):
+                                if not raw:
+                                    return '<div style="flex:2;"></div>'
+                                parts = [p.strip() for p in raw.split(" / ")]
+                                inner = "<br>".join(f"{emoji} {p}" for p in parts)
+                                return f'<div style="flex:2;">{inner}</div>'
+
+                            gold_cell = _medal_cell("🥇", matched_result["gold"])
+                            silver_cell = _medal_cell("🥈", matched_result["silver"])
+                            bronze_cell = _medal_cell("🥉", matched_result["bronze"])
                             evt_html += (
                                 f'<div style="display:flex;padding:6px 4px;border-bottom:1px solid #f0f0f0;'
                                 f'font-size:13px;align-items:center;color:#333;'
                                 f'border-left:3px solid #28A745;background:#f8fff8;">'
                                 f'<div style="flex:3;">{evt_display}</div>'
-                                f'{medal_parts}'
+                                f'{gold_cell}{silver_cell}{bronze_cell}'
                                 '</div>'
                             )
                         else:
@@ -1342,6 +1343,7 @@ def leaderboard_page():
     leaderboard_html += '<div style="flex: 1; font-weight: 600; color: #666;">Placement</div>'
     leaderboard_html += '<div style="flex: 3; font-weight: 600; color: #666;">User</div>'
     leaderboard_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Correct Picks</div>'
+    leaderboard_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Projected Picks</div>'
     leaderboard_html += '</div>'
 
     for i, user in enumerate(sorted_users):
@@ -1349,12 +1351,15 @@ def leaderboard_page():
         is_current = user == current_user
         name_display = f"<strong>{user}</strong> (you)" if is_current else user
         score_display = f"<strong>{scores[user]['correct']}</strong> / {scores[user]['total']}"
+        projected = scores[user].get("projected", scores[user]["correct"])
+        proj_display = f"<strong>{projected}</strong> / {scores[user]['total']}"
         border = 'border-bottom: 1px solid #f0f0f0;' if i < len(sorted_users) - 1 else ''
 
         leaderboard_html += f'<div style="display: flex; padding: 12px 0; {border} align-items: center;">'
         leaderboard_html += f'<div style="flex: 1; font-weight: 700;">#{rank}</div>'
         leaderboard_html += f'<div style="flex: 3;">{name_display}</div>'
         leaderboard_html += f'<div style="flex: 2; text-align: right;">{score_display}</div>'
+        leaderboard_html += f'<div style="flex: 2; text-align: right; color: #666;">{proj_display}</div>'
         leaderboard_html += '</div>'
 
     leaderboard_html += '</div>'

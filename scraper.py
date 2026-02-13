@@ -559,6 +559,36 @@ def _get_event_winner_from_data(sport_id: str, event_keyword: str) -> str | None
     return None
 
 
+def get_projected_leaders() -> dict[str, list[str]]:
+    """
+    Get projected winners for all categories based on current leaders.
+    For finished categories, returns the actual result.
+    For unfinished categories, returns whoever is currently leading.
+    Returns dict of category_id -> list of projected winners.
+    """
+    results = get_category_results()
+    projected = dict(results)  # Start with actual results
+
+    for cat in get_all_categories():
+        if cat.id in projected:
+            continue  # Already have actual result
+
+        leader = None
+        if cat.id in _DISCIPLINE_TO_SPORT_ID.values():
+            leader = _get_sport_gold_leader_from_data(cat.id)
+        elif cat.id == "overall":
+            leader = _get_overall_gold_leader_from_data()
+        elif cat.id == "featured_mens_ice_hockey_gold":
+            leader = _get_event_winner_from_data("ice_hockey", "Men")
+        elif cat.id == "prop_womens_figure_skating_country":
+            leader = _get_event_winner_from_data("figure_skating", "Women's Singles")
+
+        if leader:
+            projected[cat.id] = [c.strip() for c in leader.split(",")]
+
+    return projected
+
+
 def update_results_from_scraper():
     """
     Fetch Olympics.com data and update category results in the DB.
