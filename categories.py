@@ -18,7 +18,7 @@ ANSWER_NUMBER = "number"      # Numeric answer
 
 # Featured event-linked bets: (sport, event_name, gender, display_name)
 FEATURED_EVENTS = [
-    ("Ice Hockey", "Men's", "Men", "Men's Ice Hockey Gold"),
+    ("Ice Hockey", "Men", "Men", "Men's Ice Hockey Gold"),
 ]
 
 # Prop bets that aren't tied to a single event

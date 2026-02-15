@@ -644,7 +644,8 @@ def render_prediction_set_content(pred_set):
 
     # Predictions count and Delete Set row
     col_count, col_delete = st.columns([3, 1])
-    made_predictions = len(predictions)
+    valid_category_ids = {c.id for c in all_categories}
+    made_predictions = sum(1 for cid in predictions if cid in valid_category_ids)
     total_categories = len(all_categories)
     with col_count:
         st.write(f"**{made_predictions}** of **{total_categories}** predictions made")
@@ -1121,6 +1122,27 @@ def results_page():
         categories = get_all_categories()
         results = get_category_results()
 
+        # Load user's predictions if logged in
+        user_predictions: dict[str, str] = {}
+        if st.session_state.get("user_name"):
+            pred_sets = get_user_prediction_sets(st.session_state.user_name)
+            if pred_sets:
+                # Build options: default to current_set_id if set
+                set_options = {s["id"]: s["name"] for s in pred_sets}
+                current_set = st.session_state.get("current_set_id")
+                default_idx = 0
+                set_id_list = list(set_options.keys())
+                if current_set and current_set in set_id_list:
+                    default_idx = set_id_list.index(current_set)
+                selected_set_id = st.selectbox(
+                    "Show picks from",
+                    set_id_list,
+                    index=default_idx,
+                    format_func=lambda x: set_options[x],
+                    key="results_pick_set",
+                )
+                user_predictions = get_predictions_for_set(selected_set_id)
+
         # Separate into sport-level and other (featured / prop / overall)
         sport_cats = []
         other_cats = []
@@ -1167,7 +1189,19 @@ def results_page():
                         status = ""
 
                 status_part = f" — {status}" if status else ""
-                label = f"{cat.display_name}{status_part}  ({events_completed}/{cat.event_count} events)"
+                # Append user's pick with correctness indicator
+                pick_part = ""
+                user_pick = user_predictions.get(cat.id)
+                if user_pick:
+                    if result:
+                        result_values = result if isinstance(result, list) else [result]
+                        if user_pick in result_values:
+                            pick_part = f" · Your pick: {user_pick} ✅"
+                        else:
+                            pick_part = f" · Your pick: {user_pick} ❌"
+                    else:
+                        pick_part = f" · Your pick: {user_pick}"
+                label = f"{cat.display_name}{status_part}  ({events_completed}/{cat.event_count} events){pick_part}"
                 with st.expander(label, expanded=False):
                     # Get all events for this sport from EVENTS_DATA
                     all_sport_events = [e for e in get_all_events() if e.sport == cat.sport]
@@ -1245,8 +1279,20 @@ def results_page():
                     else:
                         icon = "⏳"
                         result_text = "Pending"
+                    # Append user's pick inline
+                    pick_text = ""
+                    user_pick = user_predictions.get(cat.id)
+                    if user_pick:
+                        if result:
+                            result_values = result if isinstance(result, list) else [result]
+                            if user_pick in result_values:
+                                pick_text = f" · Your pick: {user_pick} ✅"
+                            else:
+                                pick_text = f" · Your pick: {user_pick} ❌"
+                        else:
+                            pick_text = f" · Your pick: {user_pick}"
                     st.markdown(
-                        f"{icon} **{cat.display_name}** — {result_text}"
+                        f"{icon} **{cat.display_name}** — {result_text}{pick_text}"
                     )
 
     # ── Tab 3: Medalists ────────────────────────────────────────────────

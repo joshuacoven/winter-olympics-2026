@@ -36,45 +36,72 @@ OLYMPICS_MEDALS_URL = "https://www.olympics.com/en/milano-cortina-2026/medals"
 OLYMPICS_MEDALLISTS_URL = "https://www.olympics.com/en/milano-cortina-2026/medals/medallists"
 
 # IOC 3-letter codes to country names (matching events.py WINTER_OLYMPICS_COUNTRIES)
+# Only codes whose official IOC name differs from our display name need to be here.
+# Unknown codes are auto-resolved via _resolve_ioc_code() from Olympics.com data.
 IOC_TO_COUNTRY = {
+    "AIN": "Individual Neutral Athletes",
+    "AUS": "Australia",
     "AUT": "Austria",
+    "BEL": "Belgium",
+    "BLR": "Belarus",
+    "BRA": "Brazil",
     "BUL": "Bulgaria",
     "CAN": "Canada",
     "CHN": "China",
     "CRO": "Croatia",
     "CZE": "Czech Republic",
+    "ESP": "Spain",
     "EST": "Estonia",
     "FIN": "Finland",
     "FRA": "France",
+    "GBR": "Great Britain",
     "GER": "Germany",
     "HUN": "Hungary",
     "ISR": "Israel",
     "ITA": "Italy",
     "JAM": "Jamaica",
     "JPN": "Japan",
+    "KAZ": "Kazakhstan",
+    "KOR": "South Korea",
     "LAT": "Latvia",
     "LIE": "Liechtenstein",
     "NED": "Netherlands",
     "NOR": "Norway",
     "NZL": "New Zealand",
+    "POL": "Poland",
     "ROC": "ROC/Russia",
     "RUS": "ROC/Russia",
-    "AIN": "Individual Neutral Athletes",
-    "KOR": "South Korea",
-    "SWE": "Sweden",
-    "SUI": "Switzerland",
-    "TPE": "Chinese Taipei",
-    "USA": "United States",
-    "AUS": "Australia",
-    "BLR": "Belarus",
-    "BEL": "Belgium",
-    "GBR": "Great Britain",
-    "POL": "Poland",
-    "SVK": "Slovakia",
     "SLO": "Slovenia",
-    "ESP": "Spain",
+    "SUI": "Switzerland",
+    "SVK": "Slovakia",
+    "SWE": "Sweden",
+    "TPE": "Chinese Taipei",
     "UKR": "Ukraine",
+    "USA": "United States",
 }
+
+# Runtime cache for IOC codes discovered from Olympics.com data
+_ioc_cache: dict[str, str] = {}
+
+
+def _resolve_ioc_code(ioc: str) -> str:
+    """Resolve an IOC code to a country name.
+
+    Checks the static mapping first, then a runtime cache populated from
+    Olympics.com data. Falls back to the raw IOC code as a last resort.
+    """
+    if ioc in IOC_TO_COUNTRY:
+        return IOC_TO_COUNTRY[ioc]
+    if ioc in _ioc_cache:
+        return _ioc_cache[ioc]
+    return ioc
+
+
+def _learn_ioc_code(ioc: str, description: str):
+    """Cache an IOC-to-country mapping discovered at runtime from Olympics.com."""
+    if ioc and description and ioc not in IOC_TO_COUNTRY and ioc not in _ioc_cache:
+        _ioc_cache[ioc] = description
+        logger.info("Learned new IOC code: %s -> %s", ioc, description)
 
 # Flag emoji for common IOC codes
 IOC_TO_FLAG = {
@@ -252,10 +279,13 @@ def fetch_medal_table() -> list[dict]:
         bronze = totals.get("bronze", 0)
         total = totals.get("total", 0)
 
+        # Learn IOC codes from the description field
+        _learn_ioc_code(ioc, entry.get("description", ""))
+
         if total > 0:
             result.append({
                 "ioc": ioc,
-                "country": IOC_TO_COUNTRY.get(ioc, entry.get("description", ioc)),
+                "country": _resolve_ioc_code(ioc),
                 "gold": gold,
                 "silver": silver,
                 "bronze": bronze,
@@ -388,10 +418,11 @@ def get_medalist_summary() -> list[dict]:
     result = []
     for a in athletes:
         ioc = a.get("organisation", "")
+        _learn_ioc_code(ioc, a.get("organisationName", ""))
         result.append({
             "athlete": a.get("tvName", a.get("fullName", "")),
             "ioc": ioc,
-            "country": IOC_TO_COUNTRY.get(ioc, a.get("organisationName", ioc)),
+            "country": _resolve_ioc_code(ioc),
             "gold": a.get("medalsGold", 0),
             "silver": a.get("medalsSilver", 0),
             "bronze": a.get("medalsBronze", 0),
@@ -423,7 +454,7 @@ def _get_medalist_summary_fallback() -> list[dict]:
                     athlete_map[key] = {
                         "athlete": name,
                         "ioc": ioc,
-                        "country": IOC_TO_COUNTRY.get(ioc, ioc),
+                        "country": _resolve_ioc_code(ioc),
                         "gold": 0, "silver": 0, "bronze": 0,
                     }
                 athlete_map[key][medal_type] += 1
@@ -457,7 +488,7 @@ def fetch_sport_event_results(sport_name: str) -> dict[str, dict]:
             # Handle tied medals (countries joined with " / ")
             def _resolve_countries(raw: str) -> str:
                 parts = [p.strip() for p in raw.split("/") if p.strip()]
-                return " / ".join(IOC_TO_COUNTRY.get(p, p) for p in parts)
+                return " / ".join(_resolve_ioc_code(p) for p in parts)
 
             results[row["event"]] = {
                 "gold": _resolve_countries(row.get("gold_country", "")),
@@ -524,7 +555,7 @@ def _get_sport_gold_leader_from_data(sport_id: str) -> str | None:
                 golds = disc.get("gold", 0)
                 if golds > 0:
                     ioc = entry.get("organisation", "")
-                    country = IOC_TO_COUNTRY.get(ioc, ioc)
+                    country = _resolve_ioc_code(ioc)
                     gold_counts[country] = gold_counts.get(country, 0) + golds
 
     if not gold_counts:
@@ -555,7 +586,7 @@ def _get_event_winner_from_data(sport_id: str, event_keyword: str) -> str | None
     for row in all_medalists:
         if row["sport"] == sport_display and keyword_lower in row["event"].lower():
             ioc = row["gold_country"]
-            return IOC_TO_COUNTRY.get(ioc, ioc)
+            return _resolve_ioc_code(ioc)
     return None
 
 
