@@ -106,12 +106,14 @@ def _learn_ioc_code(ioc: str, description: str):
 # Flag emoji for common IOC codes
 IOC_TO_FLAG = {
     "AUS": "\U0001f1e6\U0001f1fa", "AUT": "\U0001f1e6\U0001f1f9", "BEL": "\U0001f1e7\U0001f1ea",
-    "BLR": "\U0001f1e7\U0001f1fe", "BUL": "\U0001f1e7\U0001f1ec", "CAN": "\U0001f1e8\U0001f1e6",
+    "BLR": "\U0001f1e7\U0001f1fe", "BRA": "\U0001f1e7\U0001f1f7", "BUL": "\U0001f1e7\U0001f1ec",
+    "CAN": "\U0001f1e8\U0001f1e6",
     "CHN": "\U0001f1e8\U0001f1f3", "CRO": "\U0001f1ed\U0001f1f7", "CZE": "\U0001f1e8\U0001f1ff",
     "ESP": "\U0001f1ea\U0001f1f8", "EST": "\U0001f1ea\U0001f1ea", "FIN": "\U0001f1eb\U0001f1ee",
     "FRA": "\U0001f1eb\U0001f1f7", "GBR": "\U0001f1ec\U0001f1e7", "GER": "\U0001f1e9\U0001f1ea",
     "HUN": "\U0001f1ed\U0001f1fa", "ISR": "\U0001f1ee\U0001f1f1", "ITA": "\U0001f1ee\U0001f1f9",
-    "JAM": "\U0001f1ef\U0001f1f2", "JPN": "\U0001f1ef\U0001f1f5", "KOR": "\U0001f1f0\U0001f1f7",
+    "JAM": "\U0001f1ef\U0001f1f2", "JPN": "\U0001f1ef\U0001f1f5", "KAZ": "\U0001f1f0\U0001f1ff",
+    "KOR": "\U0001f1f0\U0001f1f7",
     "LAT": "\U0001f1f1\U0001f1fb", "LIE": "\U0001f1f1\U0001f1ee", "NED": "\U0001f1f3\U0001f1f1",
     "NOR": "\U0001f1f3\U0001f1f4", "NZL": "\U0001f1f3\U0001f1ff", "POL": "\U0001f1f5\U0001f1f1",
     "SLO": "\U0001f1f8\U0001f1ee", "SVK": "\U0001f1f8\U0001f1f0", "SUI": "\U0001f1e8\U0001f1ed",
@@ -590,6 +592,18 @@ def _get_event_winner_from_data(sport_id: str, event_keyword: str) -> str | None
     return None
 
 
+def _get_most_individual_medals_leader() -> str | None:
+    """Get the country of the athlete(s) with the most total medals."""
+    summary = get_medalist_summary()
+    if not summary:
+        return None
+
+    # summary is sorted by (-total, -gold, athlete)
+    max_total = summary[0]["total"]
+    leaders = sorted(set(r["country"] for r in summary if r["total"] == max_total))
+    return ",".join(leaders)
+
+
 def get_projected_leaders() -> dict[str, list[str]]:
     """
     Get projected winners for all categories based on current leaders.
@@ -613,6 +627,8 @@ def get_projected_leaders() -> dict[str, list[str]]:
             leader = _get_event_winner_from_data("ice_hockey", "Men")
         elif cat.id == "prop_womens_figure_skating_country":
             leader = _get_event_winner_from_data("figure_skating", "Women's Singles")
+        elif cat.id == "prop_most_individual_medals":
+            leader = _get_most_individual_medals_leader()
 
         if leader:
             projected[cat.id] = [c.strip() for c in leader.split(",")]

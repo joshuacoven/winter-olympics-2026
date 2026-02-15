@@ -818,7 +818,7 @@ def get_pool_data(pool_code: str):
         total = len(user_predictions[user])
         scores[user] = {"correct": correct, "total": total, "projected": projected_correct}
 
-    sorted_users = sorted(users, key=lambda u: scores[u]["correct"], reverse=True)
+    sorted_users = sorted(users, key=lambda u: (scores[u]["correct"], scores[u]["projected"]), reverse=True)
 
     return {
         "users": users,
@@ -872,8 +872,13 @@ def pool_view_page(show_header: bool = True):
     top3_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Projected Picks</div>'
     top3_html += '</div>'
 
+    rank = 0
+    prev_key = None
     for i, user in enumerate(sorted_users[:3]):
-        rank = i + 1
+        sort_key = (scores[user]["correct"], scores[user].get("projected", scores[user]["correct"]))
+        if sort_key != prev_key:
+            rank = i + 1
+            prev_key = sort_key
         is_current = user == current_user
         name_display = f"<strong>{user}</strong> (you)" if is_current else user
         score_display = f"<strong>{scores[user]['correct']}</strong> / {scores[user]['total']}"
@@ -1121,6 +1126,7 @@ def results_page():
     with tab_predictions:
         categories = get_all_categories()
         results = get_category_results()
+        projected = get_projected_leaders()
 
         # Load user's predictions if logged in
         user_predictions: dict[str, str] = {}
@@ -1272,28 +1278,23 @@ def results_page():
                 st.subheader("Featured & Prop Bets")
                 for cat in other_cats:
                     result = results.get(cat.id)
+                    user_pick = user_predictions.get(cat.id)
+                    pick_text = f" · Your pick: {user_pick}" if user_pick else ""
+
                     if result:
                         result_display = ", ".join(result) if isinstance(result, list) else result
-                        icon = "✅"
-                        result_text = f"🏆 {result_display}"
-                    else:
-                        icon = "⏳"
-                        result_text = "Pending"
-                    # Append user's pick inline
-                    pick_text = ""
-                    user_pick = user_predictions.get(cat.id)
-                    if user_pick:
-                        if result:
+                        # Icon reflects user's pick correctness
+                        if user_pick:
                             result_values = result if isinstance(result, list) else [result]
-                            if user_pick in result_values:
-                                pick_text = f" · Your pick: {user_pick} ✅"
-                            else:
-                                pick_text = f" · Your pick: {user_pick} ❌"
+                            icon = "✅" if user_pick in result_values else "❌"
                         else:
-                            pick_text = f" · Your pick: {user_pick}"
-                    st.markdown(
-                        f"{icon} **{cat.display_name}** — {result_text}{pick_text}"
-                    )
+                            icon = "❌"
+                        st.markdown(f"{icon} **{cat.display_name}** — 🏆 {result_display}{pick_text}")
+                    elif cat.id in projected:
+                        leader_display = ", ".join(projected[cat.id])
+                        st.markdown(f"⏳ **{cat.display_name}** — Leading: {leader_display}{pick_text}")
+                    else:
+                        st.markdown(f"⏳ **{cat.display_name}**{pick_text}")
 
     # ── Tab 3: Medalists ────────────────────────────────────────────────
     with tab_medalists:
@@ -1404,8 +1405,16 @@ def leaderboard_page():
     leaderboard_html += '<div style="flex: 2; font-weight: 600; color: #666; text-align: right;">Projected Picks</div>'
     leaderboard_html += '</div>'
 
+    rank = 0
+    prev_key = None
     for i, user in enumerate(sorted_users):
-        rank = i + 1
+        if sort_by == "Projected Picks":
+            sort_key = (scores[user]["projected"], scores[user]["correct"])
+        else:
+            sort_key = (scores[user]["correct"], scores[user]["projected"])
+        if sort_key != prev_key:
+            rank = i + 1
+            prev_key = sort_key
         is_current = user == current_user
         name_display = f"<strong>{user}</strong> (you)" if is_current else user
         score_display = f"<strong>{scores[user]['correct']}</strong> / {scores[user]['total']}"
