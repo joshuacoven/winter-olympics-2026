@@ -1229,9 +1229,6 @@ def results_page():
                     # Show rooting status only if category has started, not complete, and user has prediction
                     rooting_info = rooting_by_category.get(cat.id)
 
-                    # Debug: show what we're checking
-                    st.caption(f"Debug: rooting_info={rooting_info is not None}, user_pick={user_pick}, result={result}")
-
                     if rooting_info and user_pick and not result:
                         if rooting_info.is_possible:
                             # Still in the hunt - show what needs to happen (compact display)

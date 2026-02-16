@@ -57,26 +57,19 @@ def get_rooting_info_for_user(prediction_set_id: int) -> list[RootingInfo]:
     rooting_info_list = []
 
     for category_id, user_prediction in user_predictions.items():
-        # Debug logging
-        import sys
-
         # Skip if category is complete
         if category_id in category_results:
-            print(f"DEBUG: Skipping {category_id} - already complete", file=sys.stderr)
             continue
 
         category = get_category_by_id(category_id)
         if not category:
-            print(f"DEBUG: Skipping {category_id} - category not found", file=sys.stderr)
             continue
 
         # Calculate current standing
         standing = calculate_category_standing(category)
-        print(f"DEBUG: {category_id} - completed={standing.completed_event_count}, remaining={standing.remaining_event_count}", file=sys.stderr)
 
         # Skip if no events have started yet (nothing to root for yet)
         if standing.completed_event_count == 0:
-            print(f"DEBUG: Skipping {category_id} - no events started", file=sys.stderr)
             continue
 
         # Check if prediction is still possible
@@ -84,13 +77,11 @@ def get_rooting_info_for_user(prediction_set_id: int) -> list[RootingInfo]:
 
         # Get remaining events
         remaining_events = get_remaining_events_for_category(category, standing)
-        print(f"DEBUG: {category_id} - has {len(remaining_events)} remaining events (fuzzy match)", file=sys.stderr)
 
         # Use standing.remaining_event_count (from scraper) instead of len(remaining_events) (from fuzzy matching)
         # to avoid issues with overly aggressive fuzzy matching
         if standing.remaining_event_count == 0 and not standing.is_complete:
             # All events done but official result not entered yet
-            print(f"DEBUG: Skipping {category_id} - all events done, waiting for official result", file=sys.stderr)
             continue
 
         # Generate scenarios
