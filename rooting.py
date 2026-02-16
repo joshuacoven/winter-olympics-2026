@@ -275,10 +275,63 @@ def generate_scenarios(standing: CategoryStanding, user_prediction: str, categor
     # User is leading
     if user_prediction in leaders:
         if len(leaders) == 1:
-            scenarios.append(f"✅ **Leading!** Stay ahead to win.")
+            # User is sole leader - calculate strategic info
+            # Find second place gold count
+            second_place_golds = 0
+            second_place_countries = []
+            for country, golds in standing.gold_counts.items():
+                if country != user_prediction:
+                    if golds > second_place_golds:
+                        second_place_golds = golds
+                        second_place_countries = [country]
+                    elif golds == second_place_golds:
+                        second_place_countries.append(country)
+
+            lead = user_golds - second_place_golds
+
+            # Check if clinched (second place can't catch up even if they win all remaining)
+            # Note: Tying is winning, so >= not >
+            second_best_case = second_place_golds + standing.remaining_event_count
+
+            if user_golds >= second_best_case:
+                # Clinched! Even if 2nd place wins all remaining, they can at best tie (which is a win for user)
+                scenarios.append(f"🏆 **Clinched!** You've secured this category — no one can catch up.")
+            elif standing.remaining_event_count == 0:
+                # All events done, just waiting for official result
+                scenarios.append(f"✅ **Leading by {lead}!** All events complete — waiting for official result.")
+            else:
+                # Calculate magic number (how many more golds to guarantee a win/tie)
+                # User needs enough golds to at least TIE with 2nd place's best case (tie = win)
+                magic_number = max(0, second_place_golds + standing.remaining_event_count - user_golds)
+
+                # Format runner-up string to handle ties nicely
+                if len(second_place_countries) == 1:
+                    runner_up_str = second_place_countries[0]
+                elif len(second_place_countries) == 2:
+                    runner_up_str = f"{second_place_countries[0]} and {second_place_countries[1]} (tied)"
+                else:
+                    # 3+ countries tied
+                    runner_up_str = ", ".join(second_place_countries[:-1]) + f", and {second_place_countries[-1]} (tied)"
+
+                if magic_number == 0:
+                    # Edge case: already clinched (should be caught above, but just in case)
+                    scenarios.append(f"✅ **Leading by {lead}!** You've got this!")
+                elif magic_number > standing.remaining_event_count:
+                    # Can't clinch mathematically, just need to stay ahead (or tie!)
+                    scenarios.append(f"✅ **Leading by {lead}** over {runner_up_str}. Stay ahead (or tie!) to win!")
+                elif magic_number == 1:
+                    scenarios.append(f"✅ **Leading by {lead}** over {runner_up_str}. Win **1 more gold** to clinch.")
+                else:
+                    scenarios.append(f"✅ **Leading by {lead}** over {runner_up_str}. Win **{magic_number} more golds** to clinch.")
         else:
+            # Tied for lead (which is winning!)
             other_leaders = [c for c in leaders if c != user_prediction]
-            scenarios.append(f"🤝 **Tied for lead!** Win any remaining event to pull ahead of {', '.join(other_leaders)}.")
+            if standing.remaining_event_count == 0:
+                # All events done, tied = win
+                scenarios.append(f"🤝 **Tied for lead with {', '.join(other_leaders)}!** You win! (Tie counts as a win)")
+            else:
+                # Still events left - can pull ahead or maintain tie
+                scenarios.append(f"🤝 **Tied for lead with {', '.join(other_leaders)}!** You're winning — pull ahead or maintain the tie!")
 
     # User is behind but possible
     elif standing.remaining_event_count > 0:

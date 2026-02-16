@@ -1228,15 +1228,19 @@ def results_page():
                 with st.expander(label, expanded=False):
                     # Show rooting status only if category has started, not complete, and user has prediction
                     rooting_info = rooting_by_category.get(cat.id)
+
+                    # Debug: show what we're checking
+                    st.caption(f"Debug: rooting_info={rooting_info is not None}, user_pick={user_pick}, result={result}")
+
                     if rooting_info and user_pick and not result:
                         if rooting_info.is_possible:
-                            # Still in the hunt - show what needs to happen
+                            # Still in the hunt - show what needs to happen (compact display)
                             for scenario in rooting_info.scenarios:
-                                st.info(scenario)
+                                st.markdown(f"**{scenario}**")
                         else:
-                            # Mathematically eliminated
-                            st.error(f"❌ Mathematically eliminated — {rooting_info.current_leader} has clinched this category")
-                        st.markdown("---")
+                            # Mathematically eliminated (compact display)
+                            st.markdown(f"**❌ Mathematically eliminated** — {rooting_info.current_leader} has clinched this category")
+                        st.markdown("")  # Small spacing instead of divider
 
                     # Get all events for this sport from EVENTS_DATA
                     all_sport_events = [e for e in get_all_events() if e.sport == cat.sport]
@@ -1330,12 +1334,12 @@ def results_page():
 
                         with st.expander(label, expanded=False):
                             if rooting_info.is_possible:
-                                # Still possible - show what needs to happen
+                                # Still possible - show what needs to happen (compact display)
                                 for scenario in rooting_info.scenarios:
-                                    st.info(scenario)
+                                    st.markdown(f"**{scenario}**")
                             else:
-                                # Mathematically eliminated
-                                st.error(f"❌ Mathematically eliminated")
+                                # Mathematically eliminated (compact display)
+                                st.markdown(f"**❌ Mathematically eliminated**")
                     elif cat.id in projected:
                         leader_display = ", ".join(projected[cat.id])
                         st.markdown(f"⏳ **{cat.display_name}** — Leading: {leader_display}{pick_text}")
