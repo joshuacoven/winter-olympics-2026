@@ -1068,8 +1068,8 @@ def results_page():
     """Show actual Olympic results with medal tally in a 3-tab layout."""
     st.title("Results")
 
-    tab_medals, tab_predictions, tab_medalists, tab_rooting = st.tabs([
-        "Medal Table", "Prediction Results", "Medalists", "What to Root For"
+    tab_medals, tab_predictions, tab_medalists = st.tabs([
+        "Medal Table", "Prediction Results", "Medalists"
     ])
 
     # ── Tab 1: Medal Table ──────────────────────────────────────────────
@@ -1158,6 +1158,14 @@ def results_page():
                 )
                 user_predictions = get_predictions_for_set(selected_set_id)
 
+                # Get rooting info for status messages
+                rooting_info_list = get_rooting_info_for_user(selected_set_id)
+                rooting_by_category = {r.category_id: r for r in rooting_info_list}
+            else:
+                rooting_by_category = {}
+        else:
+            rooting_by_category = {}
+
         # Separate into sport-level and other (featured / prop / overall)
         sport_cats = []
         other_cats = []
@@ -1218,6 +1226,18 @@ def results_page():
                         pick_part = f" · Your pick: {user_pick}"
                 label = f"{cat.display_name}{status_part}  ({events_completed}/{cat.event_count} events){pick_part}"
                 with st.expander(label, expanded=False):
+                    # Show rooting status only if category has started, not complete, and user has prediction
+                    rooting_info = rooting_by_category.get(cat.id)
+                    if rooting_info and user_pick and not result:
+                        if rooting_info.is_possible:
+                            # Still in the hunt - show what needs to happen
+                            for scenario in rooting_info.scenarios:
+                                st.info(scenario)
+                        else:
+                            # Mathematically eliminated
+                            st.error(f"❌ Mathematically eliminated — {rooting_info.current_leader} has clinched this category")
+                        st.markdown("---")
+
                     # Get all events for this sport from EVENTS_DATA
                     all_sport_events = [e for e in get_all_events() if e.sport == cat.sport]
 
@@ -1289,6 +1309,7 @@ def results_page():
                     result = results.get(cat.id)
                     user_pick = user_predictions.get(cat.id)
                     pick_text = f" · Your pick: {user_pick}" if user_pick else ""
+                    rooting_info = rooting_by_category.get(cat.id)
 
                     if result:
                         result_display = ", ".join(result) if isinstance(result, list) else result
@@ -1299,6 +1320,22 @@ def results_page():
                         else:
                             icon = "❌"
                         st.markdown(f"{icon} **{cat.display_name}** — 🏆 {result_display}{pick_text}")
+                    elif user_pick and rooting_info and not result:
+                        # Category has started, not complete, user has a prediction - show rooting info in expander
+                        if cat.id in projected:
+                            leader_display = ", ".join(projected[cat.id])
+                            label = f"{cat.display_name} — Leading: {leader_display}{pick_text}"
+                        else:
+                            label = f"{cat.display_name}{pick_text}"
+
+                        with st.expander(label, expanded=False):
+                            if rooting_info.is_possible:
+                                # Still possible - show what needs to happen
+                                for scenario in rooting_info.scenarios:
+                                    st.info(scenario)
+                            else:
+                                # Mathematically eliminated
+                                st.error(f"❌ Mathematically eliminated")
                     elif cat.id in projected:
                         leader_display = ", ".join(projected[cat.id])
                         st.markdown(f"⏳ **{cat.display_name}** — Leading: {leader_display}{pick_text}")
@@ -1356,82 +1393,6 @@ def results_page():
                 )
             html += '</div>'
             st.markdown(html, unsafe_allow_html=True)
-
-    # ── Tab 4: What to Root For ────────────────────────────────────────
-    with tab_rooting:
-        if not st.session_state.get("user_name"):
-            st.info("Log in to see personalized rooting recommendations!")
-        else:
-            # Prediction set selector (reuse exact pattern from tab_predictions)
-            pred_sets = get_user_prediction_sets(st.session_state.user_name)
-            if not pred_sets:
-                st.info("No predictions yet! Make predictions to see what to root for.")
-            else:
-                # Dropdown to select prediction set
-                if len(pred_sets) == 1:
-                    selected_set_id = pred_sets[0]["id"]
-                    st.caption(f"Showing: **{pred_sets[0]['name']}**")
-                else:
-                    set_options = {s["id"]: s["name"] for s in pred_sets}
-                    selected_set_id = st.selectbox(
-                        "Show picks from",
-                        list(set_options.keys()),
-                        format_func=lambda x: set_options[x],
-                        key="rooting_pick_set",
-                    )
-
-                # Fetch rooting info
-                rooting_info = get_rooting_info_for_user(selected_set_id)
-
-                if not rooting_info:
-                    st.success("All your predictions are complete! Check the Prediction Results tab.")
-                else:
-                    # Get user timezone
-                    user_tz = st.session_state.get("timezone", "US/Eastern")
-
-                    # Active predictions (one expander per category)
-                    active = [r for r in rooting_info if r.is_possible]
-                    if active:
-                        for info in active:
-                            # Build expander label similar to Prediction Results
-                            # Format: "Category Name — Status · Your pick: Country"
-                            status_text = ""
-                            if info.user_is_leading:
-                                status_text = "Leading"
-                            elif info.current_leader:
-                                status_text = f"Behind {info.current_leader}"
-                            else:
-                                status_text = "Tracking"
-
-                            flag = _flag_for_country(info.user_prediction)
-                            label = f"{info.category_display_name} — {status_text} · Your pick: {flag} {info.user_prediction}"
-
-                            with st.expander(label, expanded=False):
-                                # Current standing
-                                if info.current_leader:
-                                    st.caption(f"Current leader: {info.current_leader}")
-
-                                # Scenario (what needs to happen)
-                                for scenario in info.scenarios:
-                                    st.markdown(scenario)
-
-                                # All remaining events
-                                if info.remaining_events:
-                                    st.markdown("**Remaining Events:**")
-                                    for event in info.remaining_events:
-                                        event_time = format_datetime(event.gold_medal_date, user_tz)
-                                        st.markdown(f"- {event_time}: {event.display_name}")
-                                else:
-                                    st.caption("No remaining events")
-
-                    # Eliminated section (keep as-is, users like this)
-                    eliminated = [r for r in rooting_info if not r.is_possible]
-                    if eliminated:
-                        with st.expander(f"❌ Mathematically Eliminated ({len(eliminated)})", expanded=False):
-                            for info in eliminated:
-                                flag = _flag_for_country(info.user_prediction)
-                                st.markdown(f"**{info.category_display_name}** — Your pick: {flag} {info.user_prediction}")
-                                st.caption(info.scenarios[0] if info.scenarios else "No longer possible to win")
 
 
 def leaderboard_page():
