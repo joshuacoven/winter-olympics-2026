@@ -347,14 +347,19 @@ def generate_scenarios(standing: CategoryStanding, user_prediction: str, categor
         gap = max_golds - user_golds
         leader_str = leaders[0] if len(leaders) == 1 else f"{leaders[0]} (tied)"
 
-        if gap == 1:
-            scenarios.append(f"📈 Need {user_prediction} to win **1 more gold** than {leader_str}.")
-        else:
-            scenarios.append(f"📈 Need {user_prediction} to win **{gap} more golds** than {leader_str}.")
+        # Show current situation - let user understand what needs to happen
+        remaining_str = f"{standing.remaining_event_count} event" + ("s" if standing.remaining_event_count != 1 else "")
 
-        # Add context about remaining events
-        if standing.remaining_event_count <= gap:
-            scenarios.append(f"⚠️ Only {standing.remaining_event_count} events left — need near-perfect results!")
+        if gap == 1:
+            scenarios.append(
+                f"📈 **Behind by 1.** {user_prediction}: {user_golds} gold, {leader_str}: {max_golds} golds. "
+                f"{remaining_str.capitalize()} remaining."
+            )
+        else:
+            scenarios.append(
+                f"📈 **Behind by {gap}.** {user_prediction}: {user_golds} golds, {leader_str}: {max_golds} golds. "
+                f"{remaining_str.capitalize()} remaining."
+            )
 
     # Eliminated
     else:
