@@ -84,9 +84,11 @@ def get_rooting_info_for_user(prediction_set_id: int) -> list[RootingInfo]:
 
         # Get remaining events
         remaining_events = get_remaining_events_for_category(category, standing)
-        print(f"DEBUG: {category_id} - has {len(remaining_events)} remaining events", file=sys.stderr)
+        print(f"DEBUG: {category_id} - has {len(remaining_events)} remaining events (fuzzy match)", file=sys.stderr)
 
-        if not remaining_events and not standing.is_complete:
+        # Use standing.remaining_event_count (from scraper) instead of len(remaining_events) (from fuzzy matching)
+        # to avoid issues with overly aggressive fuzzy matching
+        if standing.remaining_event_count == 0 and not standing.is_complete:
             # All events done but official result not entered yet
             print(f"DEBUG: Skipping {category_id} - all events done, waiting for official result", file=sys.stderr)
             continue
