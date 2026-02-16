@@ -5,6 +5,7 @@ Calculates what users should root for based on their predictions
 and current medal standings.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
