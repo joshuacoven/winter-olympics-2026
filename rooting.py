@@ -114,7 +114,8 @@ def get_rooting_info_for_user(prediction_set_id: int) -> list[RootingInfo]:
     rooting_info_list.sort(
         key=lambda r: (
             urgency_order.get(r.urgency, 3),
-            r.remaining_events[0].gold_medal_date if r.remaining_events else datetime.max.replace(tzinfo=ZoneInfo("UTC"))
+            # Event dates are timezone-naive, so use naive datetime.max for consistency
+            r.remaining_events[0].gold_medal_date if r.remaining_events else datetime.max
         )
     )
 
@@ -232,7 +233,13 @@ def get_remaining_events_for_category(category: PredictionCategory, standing: Ca
     # For overall category: show next 10 events across all sports
     elif category.is_overall:
         now = datetime.now(ZoneInfo("Europe/Rome"))
-        future_events = [e for e in all_events if e.gold_medal_date > now]
+        future_events = []
+        for e in all_events:
+            event_date = e.gold_medal_date
+            if event_date.tzinfo is None:
+                event_date = event_date.replace(tzinfo=ZoneInfo("Europe/Rome"))
+            if event_date > now:
+                future_events.append(e)
         return sorted(future_events, key=lambda e: e.gold_medal_date)[:10]
 
     # For featured events: return empty (admin-managed)
@@ -302,12 +309,18 @@ def calculate_urgency(events: list[Event]) -> str:
     next_event = events[0]
     now = datetime.now(ZoneInfo("Europe/Rome"))
 
+    # Event dates are timezone-naive but represent Europe/Rome time
+    # Localize the event date to Europe/Rome for comparison
+    event_date = next_event.gold_medal_date
+    if event_date.tzinfo is None:
+        event_date = event_date.replace(tzinfo=ZoneInfo("Europe/Rome"))
+
     # Today
-    if next_event.gold_medal_date.date() == now.date():
+    if event_date.date() == now.date():
         return "today"
 
     # Within 7 days
-    if next_event.gold_medal_date <= now + timedelta(days=7):
+    if event_date <= now + timedelta(days=7):
         return "this_week"
 
     return "later"
