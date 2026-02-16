@@ -1362,7 +1362,7 @@ def results_page():
         if not st.session_state.get("user_name"):
             st.info("Log in to see personalized rooting recommendations!")
         else:
-            # Prediction set selector
+            # Prediction set selector (reuse exact pattern from tab_predictions)
             pred_sets = get_user_prediction_sets(st.session_state.user_name)
             if not pred_sets:
                 st.info("No predictions yet! Make predictions to see what to root for.")
@@ -1373,46 +1373,58 @@ def results_page():
                     st.caption(f"Showing: **{pred_sets[0]['name']}**")
                 else:
                     set_options = {s["id"]: s["name"] for s in pred_sets}
-                    sel_col, _ = st.columns([1, 2])
-                    with sel_col:
-                        selected_set_id = st.selectbox(
-                            "Select Prediction Set",
-                            options=list(set_options.keys()),
-                            format_func=lambda x: set_options[x],
-                            key="rooting_set_selector"
-                        )
+                    selected_set_id = st.selectbox(
+                        "Show picks from",
+                        list(set_options.keys()),
+                        format_func=lambda x: set_options[x],
+                        key="rooting_pick_set",
+                    )
 
                 # Fetch rooting info
                 rooting_info = get_rooting_info_for_user(selected_set_id)
 
                 if not rooting_info:
-                    st.success("All your predictions are complete! Check the Prediction Results tab to see how you did.")
+                    st.success("All your predictions are complete! Check the Prediction Results tab.")
                 else:
-                    # Summary stats
-                    active_count = sum(1 for r in rooting_info if r.is_possible)
-                    eliminated_count = sum(1 for r in rooting_info if not r.is_possible)
-                    st.write(f"**{active_count}** predictions still in play, **{eliminated_count}** eliminated")
-
                     # Get user timezone
-                    user_tz = st.session_state.get("timezone", "America/New_York")
+                    user_tz = st.session_state.get("timezone", "US/Eastern")
 
-                    # Section 1: High Priority (today/this week)
-                    high_priority = [r for r in rooting_info if r.is_possible and r.urgency in ("today", "this_week")]
-                    if high_priority:
-                        st.subheader("🔥 Upcoming Events You Care About")
-                        for info in high_priority:
-                            _render_rooting_card(info, user_tz)
+                    # Active predictions (one expander per category)
+                    active = [r for r in rooting_info if r.is_possible]
+                    if active:
+                        for info in active:
+                            # Build expander label similar to Prediction Results
+                            # Format: "Category Name — Status · Your pick: Country"
+                            status_text = ""
+                            if info.user_is_leading:
+                                status_text = "Leading"
+                            elif info.current_leader:
+                                status_text = f"Behind {info.current_leader}"
+                            else:
+                                status_text = "Tracking"
 
-                    # Section 2: Later Events (collapsible expanders)
-                    later = [r for r in rooting_info if r.is_possible and r.urgency == "later"]
-                    if later:
-                        st.subheader("📅 Coming Up Later")
-                        for info in later:
-                            next_date = info.remaining_events[0].gold_medal_date.strftime('%b %d') if info.remaining_events else "TBD"
-                            with st.expander(f"{info.category_display_name} — Next: {next_date}"):
-                                _render_rooting_detail(info, user_tz)
+                            flag = _flag_for_country(info.user_prediction)
+                            label = f"{info.category_display_name} — {status_text} · Your pick: {flag} {info.user_prediction}"
 
-                    # Section 3: Eliminated (collapsed by default)
+                            with st.expander(label, expanded=False):
+                                # Current standing
+                                if info.current_leader:
+                                    st.caption(f"Current leader: {info.current_leader}")
+
+                                # Scenario (what needs to happen)
+                                for scenario in info.scenarios:
+                                    st.markdown(scenario)
+
+                                # All remaining events
+                                if info.remaining_events:
+                                    st.markdown("**Remaining Events:**")
+                                    for event in info.remaining_events:
+                                        event_time = format_datetime(event.gold_medal_date, user_tz)
+                                        st.markdown(f"- {event_time}: {event.display_name}")
+                                else:
+                                    st.caption("No remaining events")
+
+                    # Eliminated section (keep as-is, users like this)
                     eliminated = [r for r in rooting_info if not r.is_possible]
                     if eliminated:
                         with st.expander(f"❌ Mathematically Eliminated ({len(eliminated)})", expanded=False):
@@ -1420,49 +1432,6 @@ def results_page():
                                 flag = _flag_for_country(info.user_prediction)
                                 st.markdown(f"**{info.category_display_name}** — Your pick: {flag} {info.user_prediction}")
                                 st.caption(info.scenarios[0] if info.scenarios else "No longer possible to win")
-
-
-def _render_rooting_card(info: RootingInfo, user_tz: str):
-    """Render a high-priority rooting card with next event details."""
-    with st.container():
-        st.markdown(f"### {info.category_display_name}")
-
-        # User's pick with flag
-        flag = _flag_for_country(info.user_prediction)
-        st.markdown(f"**Your Pick:** {flag} {info.user_prediction}")
-
-        # Current standing
-        if info.current_leader:
-            st.caption(f"Current leader: {info.current_leader}")
-
-        # Scenario (what needs to happen)
-        for scenario in info.scenarios:
-            st.markdown(scenario)
-
-        # Next event timing
-        if info.remaining_events:
-            next_event = info.remaining_events[0]
-            event_time = format_datetime(next_event.gold_medal_date, user_tz)
-            st.markdown(f"📅 **Next Event:** {event_time} — {next_event.display_name}")
-
-        st.divider()
-
-
-def _render_rooting_detail(info: RootingInfo, user_tz: str):
-    """Render detailed rooting info in an expander."""
-    flag = _flag_for_country(info.user_prediction)
-    st.markdown(f"**Your Pick:** {flag} {info.user_prediction}")
-
-    if info.current_leader:
-        st.caption(f"Current leader: {info.current_leader}")
-
-    for scenario in info.scenarios:
-        st.markdown(scenario)
-
-    st.markdown("**Remaining Events:**")
-    for event in info.remaining_events[:10]:  # Show max 10 events
-        event_time = format_datetime(event.gold_medal_date, user_tz)
-        st.markdown(f"- {event_time}: {event.display_name}")
 
 
 def leaderboard_page():
