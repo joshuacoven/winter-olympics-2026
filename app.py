@@ -29,7 +29,7 @@ from events import get_all_events
 from scraper import (
     update_results_from_scraper, ADMIN_ONLY_CATEGORIES,
     fetch_medal_table, fetch_all_medalists, get_medalist_summary,
-    fetch_sport_event_results, IOC_TO_FLAG, IOC_TO_COUNTRY,
+    fetch_sport_event_results, IOC_TO_FLAG, IOC_TO_COUNTRY, _ioc_to_flag,
     get_projected_leaders,
 )
 from rooting import get_rooting_info_for_user, RootingInfo
@@ -983,7 +983,7 @@ def _medal_circle(color: str, label: str) -> str:
 
 def _flag_for_ioc(ioc: str) -> str:
     """Return flag emoji for an IOC code, or empty string."""
-    return IOC_TO_FLAG.get(ioc, "")
+    return IOC_TO_FLAG.get(ioc, "") or _ioc_to_flag(ioc)
 
 
 def _flag_for_country(country_name: str) -> str:

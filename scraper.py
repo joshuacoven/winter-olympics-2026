@@ -12,6 +12,7 @@ import json
 import subprocess
 import streamlit as st
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from database import save_category_result, get_category_results, delete_category_result
 from categories import get_all_categories
 
@@ -40,44 +41,102 @@ OLYMPICS_MEDALLISTS_URL = "https://www.olympics.com/en/milano-cortina-2026/medal
 # Unknown codes are auto-resolved via _resolve_ioc_code() from Olympics.com data.
 IOC_TO_COUNTRY = {
     "AIN": "Individual Neutral Athletes",
+    "ALB": "Albania",
+    "AND": "Andorra",
+    "ARG": "Argentina",
+    "ARM": "Armenia",
     "AUS": "Australia",
     "AUT": "Austria",
+    "AZE": "Azerbaijan",
     "BEL": "Belgium",
+    "BEN": "Benin",
+    "BIH": "Bosnia and Herzegovina",
     "BLR": "Belarus",
+    "BOL": "Bolivia",
     "BRA": "Brazil",
     "BUL": "Bulgaria",
     "CAN": "Canada",
+    "CHI": "Chile",
     "CHN": "China",
+    "COL": "Colombia",
     "CRO": "Croatia",
+    "CYP": "Cyprus",
     "CZE": "Czech Republic",
+    "DEN": "Denmark",
+    "ECU": "Ecuador",
+    "ERI": "Eritrea",
     "ESP": "Spain",
     "EST": "Estonia",
     "FIN": "Finland",
     "FRA": "France",
     "GBR": "Great Britain",
+    "GEO": "Georgia",
     "GER": "Germany",
+    "GRE": "Greece",
+    "GBS": "Guinea-Bissau",
+    "HAI": "Haiti",
+    "HKG": "Hong Kong",
     "HUN": "Hungary",
+    "ICE": "Iceland",  # IOC code ISL also used
+    "IND": "India",
+    "IRI": "Iran",
+    "IRL": "Ireland",
+    "ISL": "Iceland",
     "ISR": "Israel",
     "ITA": "Italy",
     "JAM": "Jamaica",
     "JPN": "Japan",
     "KAZ": "Kazakhstan",
+    "KEN": "Kenya",
+    "KOS": "Kosovo",
+    "KGZ": "Kyrgyzstan",
     "KOR": "South Korea",
     "LAT": "Latvia",
+    "LBN": "Lebanon",
     "LIE": "Liechtenstein",
+    "LTU": "Lithuania",
+    "LUX": "Luxembourg",
+    "MAD": "Madagascar",
+    "MAS": "Malaysia",
+    "MLT": "Malta",
+    "MEX": "Mexico",
+    "MDA": "Moldova",
+    "MON": "Monaco",
+    "MGL": "Mongolia",
+    "MNE": "Montenegro",
+    "MAR": "Morocco",
     "NED": "Netherlands",
     "NOR": "Norway",
     "NZL": "New Zealand",
+    "NGR": "Nigeria",
+    "MKD": "North Macedonia",
+    "PAK": "Pakistan",
+    "PHI": "Philippines",
     "POL": "Poland",
+    "POR": "Portugal",
+    "PUR": "Puerto Rico",
     "ROC": "ROC/Russia",
+    "ROU": "Romania",
     "RUS": "ROC/Russia",
-    "SLO": "Slovenia",
-    "SUI": "Switzerland",
+    "SMR": "San Marino",
+    "KSA": "Saudi Arabia",
+    "SRB": "Serbia",
+    "SGP": "Singapore",
     "SVK": "Slovakia",
+    "SLO": "Slovenia",
+    "RSA": "South Africa",
+    "SUI": "Switzerland",
     "SWE": "Sweden",
+    "THA": "Thailand",
     "TPE": "Chinese Taipei",
+    "TTO": "Trinidad and Tobago",
+    "TUR": "Turkey",
+    "UAE": "United Arab Emirates",
     "UKR": "Ukraine",
+    "URU": "Uruguay",
     "USA": "United States",
+    "UZB": "Uzbekistan",
+    "VEN": "Venezuela",
 }
 
 # Runtime cache for IOC codes discovered from Olympics.com data
@@ -103,27 +162,58 @@ def _learn_ioc_code(ioc: str, description: str):
         _ioc_cache[ioc] = description
         logger.info("Learned new IOC code: %s -> %s", ioc, description)
 
-# Flag emoji for common IOC codes
-IOC_TO_FLAG = {
-    "AUS": "\U0001f1e6\U0001f1fa", "AUT": "\U0001f1e6\U0001f1f9", "BEL": "\U0001f1e7\U0001f1ea",
-    "BLR": "\U0001f1e7\U0001f1fe", "BRA": "\U0001f1e7\U0001f1f7", "BUL": "\U0001f1e7\U0001f1ec",
-    "CAN": "\U0001f1e8\U0001f1e6",
-    "CHN": "\U0001f1e8\U0001f1f3", "CRO": "\U0001f1ed\U0001f1f7", "CZE": "\U0001f1e8\U0001f1ff",
-    "ESP": "\U0001f1ea\U0001f1f8", "EST": "\U0001f1ea\U0001f1ea", "FIN": "\U0001f1eb\U0001f1ee",
-    "FRA": "\U0001f1eb\U0001f1f7", "GBR": "\U0001f1ec\U0001f1e7", "GER": "\U0001f1e9\U0001f1ea",
-    "HUN": "\U0001f1ed\U0001f1fa", "ISR": "\U0001f1ee\U0001f1f1", "ITA": "\U0001f1ee\U0001f1f9",
-    "JAM": "\U0001f1ef\U0001f1f2", "JPN": "\U0001f1ef\U0001f1f5", "KAZ": "\U0001f1f0\U0001f1ff",
-    "KOR": "\U0001f1f0\U0001f1f7",
-    "LAT": "\U0001f1f1\U0001f1fb", "LIE": "\U0001f1f1\U0001f1ee", "NED": "\U0001f1f3\U0001f1f1",
-    "NOR": "\U0001f1f3\U0001f1f4", "NZL": "\U0001f1f3\U0001f1ff", "POL": "\U0001f1f5\U0001f1f1",
-    "SLO": "\U0001f1f8\U0001f1ee", "SVK": "\U0001f1f8\U0001f1f0", "SUI": "\U0001f1e8\U0001f1ed",
-    "SWE": "\U0001f1f8\U0001f1ea", "TPE": "\U0001f1f9\U0001f1fc", "UKR": "\U0001f1fa\U0001f1e6",
-    "USA": "\U0001f1fa\U0001f1f8", "AIN": "\U0001f3f3\ufe0f",
+# IOC code → ISO 3166-1 alpha-2 code (for generating flag emojis programmatically).
+# Only codes where IOC differs from ISO alpha-2 need to be listed here.
+# Codes that match (e.g. "FR" for France) are auto-derived.
+_IOC_TO_ISO2 = {
+    "AIN": None,  # Individual Neutral Athletes - no country flag
+    "BIH": "BA", "BUL": "BG", "CHI": "CL", "CRO": "HR", "CZE": "CZ",
+    "DEN": "DK", "ESP": "ES", "GBR": "GB", "GBS": "GW", "GER": "DE",
+    "GRE": "GR", "HAI": "HT", "HKG": "HK", "ICE": "IS", "IRI": "IR",
+    "IRL": "IE", "KGZ": "KG", "KOR": "KR", "KOS": "XK", "KSA": "SA",
+    "LAT": "LV", "LBN": "LB", "LIE": "LI", "LTU": "LT", "LUX": "LU",
+    "MAD": "MG", "MAS": "MY", "MEX": "MX", "MDA": "MD", "MGL": "MN",
+    "MKD": "MK", "MLT": "MT", "MNE": "ME", "MON": "MC", "MAR": "MA",
+    "NED": "NL", "NGR": "NG", "NOR": "NO", "PHI": "PH", "POR": "PT",
+    "PUR": "PR", "ROC": "RU", "ROU": "RO", "RSA": "ZA", "RUS": "RU",
+    "SGP": "SG", "SLO": "SI", "SMR": "SM", "SRB": "RS", "SUI": "CH",
+    "SVK": "SK", "THA": "TH", "TPE": "TW", "TTO": "TT", "TUR": "TR",
+    "UAE": "AE", "URU": "UY", "UZB": "UZ", "VEN": "VE",
 }
+
+
+def _ioc_to_flag(ioc: str) -> str:
+    """Generate a flag emoji from an IOC code.
+
+    Uses IOC→ISO alpha-2 mapping to programmatically generate the Unicode
+    regional indicator flag emoji. Falls back to empty string for unknown codes
+    or special entries (e.g. AIN/Individual Neutral Athletes gets white flag).
+    """
+    if ioc == "AIN":
+        return "\U0001f3f3\ufe0f"  # white flag
+
+    # Look up ISO alpha-2, or derive it from IOC code (works when they match)
+    iso2 = _IOC_TO_ISO2.get(ioc)
+    if iso2 is None and ioc not in _IOC_TO_ISO2:
+        # Not in override map — try using first 2 chars of IOC code as ISO alpha-2
+        iso2 = ioc[:2]
+
+    if not iso2:
+        return ""
+
+    # Convert ISO alpha-2 to regional indicator symbols (flag emoji)
+    try:
+        return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in iso2.upper())
+    except (ValueError, TypeError):
+        return ""
+
+
+# Build IOC_TO_FLAG dict for backward compatibility (used by app.py imports)
+IOC_TO_FLAG = {ioc: _ioc_to_flag(ioc) for ioc in IOC_TO_COUNTRY}
 
 # Olympics.com discipline codes → our sport category IDs
 _DISCIPLINE_TO_SPORT_ID = {
-    "ALS": "alpine_skiing",
+    "ALP": "alpine_skiing",
     "BTH": "biathlon",
     "BOB": "bobsled",
     "CCS": "cross_country_skiing",
@@ -518,7 +608,8 @@ def _category_is_complete(category_id: str) -> bool:
     complete if the scraper already has results for all its events
     (handles schedule changes where events finish earlier than expected).
     """
-    now = datetime.now()
+    rome_tz = ZoneInfo("Europe/Rome")
+    now = datetime.now(rome_tz).replace(tzinfo=None)
     for cat in get_all_categories():
         if cat.id == category_id:
             if cat.last_event_date and cat.last_event_date < now:
