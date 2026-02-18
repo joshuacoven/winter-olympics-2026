@@ -182,7 +182,7 @@ _IOC_TO_ISO2 = {
 }
 
 
-def _ioc_to_flag(ioc: str) -> str:
+def ioc_to_flag(ioc: str) -> str:
     """Generate a flag emoji from an IOC code.
 
     Uses IOC→ISO alpha-2 mapping to programmatically generate the Unicode
@@ -209,7 +209,7 @@ def _ioc_to_flag(ioc: str) -> str:
 
 
 # Build IOC_TO_FLAG dict for backward compatibility (used by app.py imports)
-IOC_TO_FLAG = {ioc: _ioc_to_flag(ioc) for ioc in IOC_TO_COUNTRY}
+IOC_TO_FLAG = {ioc: ioc_to_flag(ioc) for ioc in IOC_TO_COUNTRY}
 
 # Olympics.com discipline codes → our sport category IDs
 _DISCIPLINE_TO_SPORT_ID = {
