@@ -596,7 +596,6 @@ def fetch_sport_event_results(sport_name: str) -> dict[str, dict]:
 # Categories that need admin entry (scraper can't resolve these)
 ADMIN_ONLY_CATEGORIES = {
     "prop_vonn_gold",
-    "prop_usa_figure_skating_medals",
     "prop_most_individual_medals",
 }
 
@@ -651,6 +650,20 @@ def _get_sport_gold_leader_from_data(sport_id: str) -> str | None:
                     country = _resolve_ioc_code(ioc)
                     gold_counts[country] = gold_counts.get(country, 0) + golds
 
+    # Fallback: if medal standings don't have this discipline, count from medalists
+    if not gold_counts:
+        sport_display = _SPORT_ID_TO_NAME.get(sport_id)
+        if sport_display:
+            event_results = fetch_sport_event_results(sport_display)
+            for _evt, medals in event_results.items():
+                gold_country = medals.get("gold", "")
+                if gold_country:
+                    # Handle ties ("Country A / Country B")
+                    for c in gold_country.split(" / "):
+                        c = c.strip()
+                        if c:
+                            gold_counts[c] = gold_counts.get(c, 0) + 1
+
     if not gold_counts:
         return None
 
@@ -681,6 +694,20 @@ def _get_event_winner_from_data(sport_id: str, event_keyword: str) -> str | None
             ioc = row["gold_country"]
             return _resolve_ioc_code(ioc)
     return None
+
+
+def _get_usa_figure_skating_medal_count() -> str | None:
+    """Count total medals (gold+silver+bronze) won by USA in Figure Skating."""
+    results = fetch_sport_event_results("Figure Skating")
+    if not results:
+        return None
+    count = 0
+    for _evt, medals in results.items():
+        for medal_type in ("gold", "silver", "bronze"):
+            countries = medals.get(medal_type, "")
+            if "United States" in countries:
+                count += 1
+    return str(count)
 
 
 def _get_most_individual_medals_leader() -> str | None:
@@ -744,37 +771,71 @@ def update_results_from_scraper():
             if sport_id in existing_results:
                 delete_category_result(sport_id)
             continue
-        if sport_id in existing_results:
-            continue
         leader = _get_sport_gold_leader_from_data(sport_id)
         if leader:
-            save_category_result(sport_id, leader)
+            # Always update — results may change as late events finish
+            existing = existing_results.get(sport_id)
+            existing_str = ",".join(existing) if existing else None
+            if existing_str != leader:
+                if existing:
+                    delete_category_result(sport_id)
+                save_category_result(sport_id, leader)
 
     # Overall: country with most golds across all sports
     if not _category_is_complete("overall"):
         if "overall" in existing_results:
             delete_category_result("overall")
-    elif "overall" not in existing_results:
+    else:
         overall_leader = _get_overall_gold_leader_from_data()
         if overall_leader:
-            save_category_result("overall", overall_leader)
+            existing = existing_results.get("overall")
+            existing_str = ",".join(existing) if existing else None
+            if existing_str != overall_leader:
+                if existing:
+                    delete_category_result("overall")
+                save_category_result("overall", overall_leader)
 
     # Featured: Men's Ice Hockey Gold
     hockey_cat_id = "featured_mens_ice_hockey_gold"
     if not _category_is_complete(hockey_cat_id):
         if hockey_cat_id in existing_results:
             delete_category_result(hockey_cat_id)
-    elif hockey_cat_id not in existing_results:
+    else:
         winner = _get_event_winner_from_data("ice_hockey", "Men")
         if winner:
-            save_category_result(hockey_cat_id, winner)
+            existing = existing_results.get(hockey_cat_id)
+            existing_str = ",".join(existing) if existing else None
+            if existing_str != winner:
+                if existing:
+                    delete_category_result(hockey_cat_id)
+                save_category_result(hockey_cat_id, winner)
 
     # Featured: Women's Figure Skating Singles country
     fs_cat_id = "prop_womens_figure_skating_country"
     if not _category_is_complete(fs_cat_id):
         if fs_cat_id in existing_results:
             delete_category_result(fs_cat_id)
-    elif fs_cat_id not in existing_results:
-        winner = _get_event_winner_from_data("figure_skating", "Women's Singles")
+    else:
+        winner = _get_event_winner_from_data("figure_skating", "Women Single")
         if winner:
-            save_category_result(fs_cat_id, winner)
+            existing = existing_results.get(fs_cat_id)
+            existing_str = ",".join(existing) if existing else None
+            if existing_str != winner:
+                if existing:
+                    delete_category_result(fs_cat_id)
+                save_category_result(fs_cat_id, winner)
+
+    # Prop: USA Figure Skating total medals
+    usa_fs_cat_id = "prop_usa_figure_skating_medals"
+    if not _category_is_complete(usa_fs_cat_id):
+        if usa_fs_cat_id in existing_results:
+            delete_category_result(usa_fs_cat_id)
+    else:
+        count = _get_usa_figure_skating_medal_count()
+        if count:
+            existing = existing_results.get(usa_fs_cat_id)
+            existing_str = ",".join(existing) if existing else None
+            if existing_str != count:
+                if existing:
+                    delete_category_result(usa_fs_cat_id)
+                save_category_result(usa_fs_cat_id, count)
