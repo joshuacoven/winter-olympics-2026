@@ -307,6 +307,34 @@ def _curl_fetch(url: str, timeout: int = 20) -> str | None:
     return None
 
 
+@st.cache_data(ttl=3600)
+def _fetch_live_schedule() -> dict[str, datetime]:
+    """
+    Fetch the live schedule from Olympics.com and return a mapping of
+    (sport, event_name) → gold_medal_date. Cached for 1 hour.
+    Used to detect event postponements vs hardcoded dates in events.py.
+    """
+    from build_events import extract_schedule_data, parse_events, SCHEDULE_URL
+    html = _curl_fetch(SCHEDULE_URL)
+    if not html:
+        return {}
+    schedule_data = extract_schedule_data(html)
+    if not schedule_data:
+        return {}
+    events = parse_events(schedule_data)
+    # Map (sport, event_name) → gold_medal_date
+    return {(ev["sport"], ev["name"]): ev["gold_medal_date"] for ev in events}
+
+
+def _get_live_last_event_date(sport_display: str) -> datetime | None:
+    """Get the latest gold_medal_date for a sport from the live schedule."""
+    schedule = _fetch_live_schedule()
+    if not schedule:
+        return None
+    sport_dates = [dt for (sport, _name), dt in schedule.items() if sport == sport_display]
+    return max(sport_dates) if sport_dates else None
+
+
 @st.cache_data(ttl=600)
 def _fetch_olympics_medal_data() -> dict | None:
     """
@@ -603,23 +631,28 @@ ADMIN_ONLY_CATEGORIES = {
 def _category_is_complete(category_id: str) -> bool:
     """Check if all events for a category have finished.
 
-    Uses last_event_date as primary check, but also considers a sport
-    complete if the scraper already has results for all its events
-    (handles schedule changes where events finish earlier than expected).
+    Uses last_event_date as primary check. If the date has passed but
+    the scraper doesn't have all expected event results (possible schedule
+    delay), re-checks against the live Olympics.com schedule to get
+    updated dates.
     """
     rome_tz = ZoneInfo("Europe/Rome")
     now = datetime.now(rome_tz).replace(tzinfo=None)
     for cat in get_all_categories():
         if cat.id == category_id:
-            if cat.last_event_date and cat.last_event_date < now:
-                return True
-            # Fallback: check if scraper has all event results for this sport
+            if not cat.last_event_date or cat.last_event_date >= now:
+                return False
+            # Date says complete — verify with event results for sport categories
             sport_display = _SPORT_ID_TO_NAME.get(category_id)
             if sport_display and cat.event_count > 0:
                 sport_results = fetch_sport_event_results(sport_display)
                 if len(sport_results) >= cat.event_count:
                     return True
-            return False
+                # Missing events — check live schedule for postponements
+                live_date = _get_live_last_event_date(sport_display)
+                if live_date and live_date >= now:
+                    return False  # Event was postponed, not complete yet
+            return True
     return False
 
 
