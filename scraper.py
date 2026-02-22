@@ -624,7 +624,6 @@ def fetch_sport_event_results(sport_name: str) -> dict[str, dict]:
 # Categories that need admin entry (scraper can't resolve these)
 ADMIN_ONLY_CATEGORIES = {
     "prop_vonn_gold",
-    "prop_most_individual_medals",
 }
 
 
@@ -872,3 +871,18 @@ def update_results_from_scraper():
                 if existing:
                     delete_category_result(usa_fs_cat_id)
                 save_category_result(usa_fs_cat_id, count)
+
+    # Prop: Most individual medals — country of athlete with most total medals
+    medals_cat_id = "prop_most_individual_medals"
+    if not _category_is_complete(medals_cat_id):
+        if medals_cat_id in existing_results:
+            delete_category_result(medals_cat_id)
+    else:
+        leader = _get_most_individual_medals_leader()
+        if leader:
+            existing = existing_results.get(medals_cat_id)
+            existing_str = ",".join(existing) if existing else None
+            if existing_str != leader:
+                if existing:
+                    delete_category_result(medals_cat_id)
+                save_category_result(medals_cat_id, leader)
